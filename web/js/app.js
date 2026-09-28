@@ -289,9 +289,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateModelRoleUI() {
     const hasUnet = unetSelect && unetSelect.value && unetSelect.value.trim() !== '';
-    if (hasUnet) {
+    const isAnima = hasUnet && unetSelect.value.toLowerCase().includes('anima');
+
+    if (isAnima) {
       if (unetActiveBadge) {
         unetActiveBadge.style.display = 'inline-block';
+        unetActiveBadge.textContent = 'Active Anima Engine (Qwen + Wan VAE)';
+      }
+      if (checkpointLabel) {
+        checkpointLabel.textContent = 'Diffusion Checkpoint (Auto-Bypassed)';
+      }
+      if (checkpointRoleHint) {
+        checkpointRoleHint.textContent = 'Anima uses its dedicated Qwen 0.6B text encoder and Wan 2.1 VAE automatically. Checkpoint is bypassed.';
+      }
+      if (checkpointBadge) {
+        checkpointBadge.textContent = 'Bypassed (DiT Mode)';
+      }
+    } else if (hasUnet) {
+      if (unetActiveBadge) {
+        unetActiveBadge.style.display = 'inline-block';
+        unetActiveBadge.textContent = 'Active Generative Engine';
       }
       if (checkpointLabel) {
         checkpointLabel.textContent = 'CLIP & VAE Provider Checkpoint';

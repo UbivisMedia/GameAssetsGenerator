@@ -105,6 +105,7 @@ class ComfyClient:
             "unets": [],
             "loras": [],
             "vaes": [],
+            "clips": [],
             "samplers": [],
             "schedulers": []
         }
@@ -122,6 +123,8 @@ class ComfyClient:
                 models["loras"] = data["LoraLoader"]["input"]["required"]["lora_name"][0]
             if "VAELoader" in data:
                 models["vaes"] = data["VAELoader"]["input"]["required"]["vae_name"][0]
+            if "CLIPLoader" in data:
+                models["clips"] = data["CLIPLoader"]["input"]["required"]["clip_name"][0]
             if "KSampler" in data:
                 models["samplers"] = data["KSampler"]["input"]["required"]["sampler_name"][0]
                 models["schedulers"] = data["KSampler"]["input"]["required"]["scheduler"][0]
@@ -221,6 +224,14 @@ class ComfyClient:
 
         # 1.5. Inject or Configure Custom UNet if requested
         model_source_node = ckpt_node_id
+        clip_source_node = ckpt_node_id
+        clip_source_slot = 1
+        vae_source_node = ckpt_node_id
+        vae_source_slot = 2
+
+        numeric_ids = [int(k) for k in wf.keys() if k.isdigit()]
+        is_anima = bool(unet and "anima" in unet.lower())
+
         if unet and unet.strip() and unet.lower() not in ("none", "default"):
             resolved_unet = self._resolve_model_name(unet, avail_unets) or unet
             existing_unets = [k for k, v in wf.items() if v.get("class_type") == "UNETLoader"]
@@ -228,8 +239,8 @@ class ComfyClient:
                 wf[existing_unets[0]]["inputs"]["unet_name"] = resolved_unet
                 model_source_node = existing_unets[0]
             else:
-                numeric_ids = [int(k) for k in wf.keys() if k.isdigit()]
                 unet_id = str(max(numeric_ids, default=50) + 1)
+                numeric_ids.append(int(unet_id))
                 wf[unet_id] = {
                     "class_type": "UNETLoader",
                     "inputs": {
@@ -247,10 +258,68 @@ class ComfyClient:
                             if str(in_val[0]) == ckpt_node_id and in_val[1] == 0:
                                 n["inputs"][in_name] = [unet_id, 0]
                 model_source_node = unet_id
-            logger.info(f"Using Custom UNet: {resolved_unet} (Overriding Checkpoint diffusion model, CLIP/VAE from {target_ckpt if ckpt_node_id else 'None'})")
+            logger.info(f"Using Custom UNet: {resolved_unet}")
+
+        # 1.6. Special Architecture Handling: Anima (uses Qwen 0.6B / Anima text encoder and Wan 2.1 VAE)
+        if is_anima:
+            avail_clips = available.get("clips", [])
+            anima_clip_candidates = ["qwen_3_06b_base.safetensors", "jedpointreal_animaV1_txt.safetensors"]
+            chosen_clip = next((c for c in anima_clip_candidates if c in avail_clips), None)
+            if not chosen_clip:
+                chosen_clip = next((c for c in avail_clips if "qwen_3_06" in c.lower() or "anima" in c.lower()), None)
+            if not chosen_clip and avail_clips:
+                chosen_clip = avail_clips[0]
+
+            if chosen_clip:
+                clip_loader_id = str(max(numeric_ids, default=60) + 1)
+                numeric_ids.append(int(clip_loader_id))
+                wf[clip_loader_id] = {
+                    "class_type": "CLIPLoader",
+                    "inputs": {
+                        "clip_name": chosen_clip,
+                        "type": "stable_diffusion"
+                    },
+                    "_meta": {"title": f"Load Anima Text Encoder ({chosen_clip})"}
+                }
+                # Rewire CLIP consumers from ckpt_node_id to clip_loader_id
+                for nid, n in wf.items():
+                    if nid == clip_loader_id:
+                        continue
+                    for in_name, in_val in n.get("inputs", {}).items():
+                        if isinstance(in_val, list) and len(in_val) >= 2:
+                            if str(in_val[0]) == ckpt_node_id and in_val[1] == 1:
+                                n["inputs"][in_name] = [clip_loader_id, 0]
+                clip_source_node = clip_loader_id
+                clip_source_slot = 0
+                logger.info(f"Using Anima Native Text Encoder: {chosen_clip} (Resolved 768 vs 2048 CLIP mismatch)")
+
+            # Auto Wan 2.1 VAE for Anima if no custom VAE explicitly selected
+            if not vae or vae.lower() in ("default", ""):
+                anima_vae_candidates = ["wan_2.1_vae.safetensors", "Wan\\wan_2.1_vae.safetensors", "Wan/wan_2.1_vae.safetensors"]
+                chosen_vae = next((v for v in anima_vae_candidates if v in avail_vaes or v.replace("/", "\\") in avail_vaes), None)
+                if not chosen_vae:
+                    chosen_vae = next((v for v in avail_vaes if "wan" in v.lower()), None)
+                if chosen_vae:
+                    vae_loader_id = str(max(numeric_ids, default=70) + 2)
+                    numeric_ids.append(int(vae_loader_id))
+                    wf[vae_loader_id] = {
+                        "class_type": "VAELoader",
+                        "inputs": {"vae_name": chosen_vae},
+                        "_meta": {"title": f"Load Anima VAE ({chosen_vae})"}
+                    }
+                    for nid, n in wf.items():
+                        if n.get("class_type") == "VAEDecode":
+                            n.setdefault("inputs", {})["vae"] = [vae_loader_id, 0]
+                    vae_source_node = vae_loader_id
+                    vae_source_slot = 0
+                    logger.info(f"Using Anima Native VAE: {chosen_vae}")
+
+            # Safe to decouple CheckpointLoader when Anima takes over all roles
+            if ckpt_node_id and ckpt_node_id in wf:
+                wf.pop(ckpt_node_id, None)
 
         # 2. Inject or Configure LoRA if requested
-        if lora and lora.strip() and lora.lower() != "none" and ckpt_node_id:
+        if lora and lora.strip() and lora.lower() != "none":
             resolved_lora = self._resolve_model_name(lora, avail_loras) or lora
             existing_loras = [k for k, v in wf.items() if v.get("class_type") == "LoraLoader"]
             if existing_loras:
@@ -258,8 +327,8 @@ class ComfyClient:
                 wf[existing_loras[0]]["inputs"]["strength_model"] = lora_strength
                 wf[existing_loras[0]]["inputs"]["strength_clip"] = lora_strength
             else:
-                numeric_ids = [int(k) for k in wf.keys() if k.isdigit()]
                 lora_id = str(max(numeric_ids, default=100) + 1)
+                numeric_ids.append(int(lora_id))
                 wf[lora_id] = {
                     "class_type": "LoraLoader",
                     "inputs": {
@@ -267,19 +336,19 @@ class ComfyClient:
                         "strength_model": lora_strength,
                         "strength_clip": lora_strength,
                         "model": [model_source_node, 0],
-                        "clip": [ckpt_node_id, 1]
+                        "clip": [clip_source_node, clip_source_slot]
                     },
                     "_meta": {"title": f"Load LoRA ({resolved_lora})"}
                 }
-                # Rewire nodes that connected to model_source_node model or ckpt clip to lora
+                # Rewire nodes that connected to model_source_node model or clip_source to lora
                 for nid, n in wf.items():
-                    if nid in (lora_id, model_source_node, ckpt_node_id):
+                    if nid in (lora_id, model_source_node, clip_source_node):
                         continue
                     for in_name, in_val in n.get("inputs", {}).items():
                         if isinstance(in_val, list) and len(in_val) >= 2:
                             if str(in_val[0]) == model_source_node and in_val[1] == 0:
                                 n["inputs"][in_name] = [lora_id, 0]
-                            elif str(in_val[0]) == ckpt_node_id and in_val[1] == 1:
+                            elif str(in_val[0]) == clip_source_node and in_val[1] == clip_source_slot:
                                 n["inputs"][in_name] = [lora_id, 1]
                 logger.info(f"Injected LoRA: {resolved_lora} (strength: {lora_strength})")
 
@@ -290,8 +359,8 @@ class ComfyClient:
             if existing_vaes:
                 wf[existing_vaes[0]]["inputs"]["vae_name"] = resolved_vae
             else:
-                numeric_ids = [int(k) for k in wf.keys() if k.isdigit()]
                 vae_id = str(max(numeric_ids, default=200) + 2)
+                numeric_ids.append(int(vae_id))
                 wf[vae_id] = {
                     "class_type": "VAELoader",
                     "inputs": {"vae_name": resolved_vae},
