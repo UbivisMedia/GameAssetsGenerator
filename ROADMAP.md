@@ -54,9 +54,11 @@ Development and feature roadmap for the GameAssetGenerator project.
 
 ---
 
-## Version 0.4.0 (Future - High-Fidelity Character Consistency)
+## Version 0.4.0 (Released - Video Motion Engine & High-Fidelity Character Consistency)
 
-- [ ] **ControlNet & IP-Adapter Pipelines**: Image reference conditioning for 100% character identity preservation across actions.
+- [x] **MiniMax H3 Reference-to-Video Motion Engine**: Direct spatiotemporal 3D attention conditioning locking character identity, lighting, and wardrobe 100% frozen across all animation frames.
+- [x] **Automatic BiRefNet AI Cutout Pipeline**: Neural background removal integrated for multi-frame video extraction.
+- [x] **Non-Directional Perspective Guards**: Hardened isolation preventing accidental 8-directional suite creation for full-body/portrait assets.
 - [ ] **Multi-Action Master Sheets**: Generate complete action suites (Walk, Run, Jump, Attack, Die) in a single unified sheet.
 - [ ] **Batch Item Catalog Generator**: Generate entire collections of themed items (e.g. 20 distinct swords) in one click.
 

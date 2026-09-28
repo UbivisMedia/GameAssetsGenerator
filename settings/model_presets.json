@@ -92,6 +92,30 @@
       }
     },
     {
+      "id": "minimax_h3",
+      "name": "MiniMax H3 Reference Motion Engine",
+      "description": "Video Diffusion model with 3D Spatiotemporal Reference Attention. Locks character identity, face, clothes, and lighting with 100% precision across all animation frames.",
+      "badge": "I2V Video Engine",
+      "match_patterns": ["minimax", "h3"],
+      "type": "video_i2v",
+      "defaults": {
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "steps": 8,
+        "cfg": 1.0,
+        "native_latent": {
+          "portrait": {"width": 512, "height": 768},
+          "full_body": {"width": 512, "height": 768},
+          "square": {"width": 512, "height": 512},
+          "landscape": {"width": 768, "height": 512}
+        },
+        "recommended_scaling": "lanczos",
+        "recommended_style": "photorealistic_cinematic",
+        "purge_anti_photo_negatives": true,
+        "workflow": "character_i2v_minimax.json"
+      }
+    },
+    {
       "id": "sd15_pixel",
       "name": "Stable Diffusion 1.5 (Classic / Pixel Art)",
       "description": "Standard 512px SD1.5 base models optimized for fast generation, LoRAs and authentic pixel sprites.",

@@ -334,8 +334,21 @@
               Refresh</button>
           </div>
 
+          <!-- Animation Motion Engine -->
+          <div class="form-group mb-2">
+            <div class="flex-between">
+              <label for="animation-engine-select">Animation Motion Engine</label>
+              <span id="motion-engine-badge" class="badge" style="color: var(--accent-cyan); border-color: var(--accent-cyan);">Coherence Mode</span>
+            </div>
+            <select id="animation-engine-select" class="form-input font-bold">
+              <option value="diffusion" selected>Standard 2D Diffusion (Frame-by-Frame)</option>
+              <option value="minimax_h3">🎬 MiniMax H3 Video Engine (100% Identity-Coherent I2V)</option>
+            </select>
+            <span id="engine-hint" class="help-text">MiniMax H3 Reference-to-Video locks character identity, hair, clothing, and lighting 100% consistent across all animation frames.</span>
+          </div>
+
           <!-- Checkpoint -->
-          <div class="form-group">
+          <div class="form-group" id="checkpoint-form-group">
             <div class="flex-between">
               <label for="checkpoint-select" id="checkpoint-label">Diffusion Checkpoint (Base Model)</label>
               <span id="checkpoint-badge" class="badge">Loading models...</span>

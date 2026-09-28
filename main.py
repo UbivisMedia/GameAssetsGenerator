@@ -126,6 +126,7 @@ class GenerateAssetRequest(BaseModel):
     mirror_symmetry: bool = True
     chroma_color: Optional[str] = None
     chroma_tolerance: int = 35
+    animation_engine: Optional[str] = "diffusion"
 
 
 class ChromaKeyRequest(BaseModel):
@@ -688,15 +689,19 @@ def generate_asset(req: GenerateAssetRequest):
 
     # 2. Check ComfyUI or fallback to mock demo if requested or offline
     # 2. Directional suite configuration
-    is_suite = req.direction in ("8_directional", "4_cardinal", "isometric_4")
-    if req.direction == "8_directional":
-        active_directions = persp_mgr.ORDER_8_WAY
-    elif req.direction == "4_cardinal":
-        active_directions = persp_mgr.ORDER_4_CARDINAL
-    elif req.direction == "isometric_4":
-        active_directions = persp_mgr.ORDER_ISOMETRIC_4
+    if req.perspective not in ("top_down", "isometric"):
+        is_suite = False
+        active_directions = [req.direction if req.direction in ("N", "NE", "E", "SE", "S", "SW", "W", "NW") else "S"]
     else:
-        active_directions = [req.direction or "S"]
+        is_suite = req.direction in ("8_directional", "4_cardinal", "isometric_4")
+        if req.direction == "8_directional":
+            active_directions = persp_mgr.ORDER_8_WAY
+        elif req.direction == "4_cardinal":
+            active_directions = persp_mgr.ORDER_4_CARDINAL
+        elif req.direction == "isometric_4":
+            active_directions = persp_mgr.ORDER_ISOMETRIC_4
+        else:
+            active_directions = [req.direction or "S"]
 
     # Chroma key color parsing
     parsed_bg_color = None
@@ -817,14 +822,17 @@ def generate_asset(req: GenerateAssetRequest):
             ref_comfy_name = None
             frame_denoise = 1.0
 
+            is_subtle_action = req.action in ("idle", "breathe", "sit", "look", "talk")
             if step_i == 0:
                 if master_ref_bytes:
                     ref_comfy_name = comfy_client.upload_image(master_ref_bytes, filename=f"master_ref_{char_id}.png")
-                    frame_denoise = 0.50
+                    frame_denoise = 0.45
             else:
-                if last_frame_bytes:
-                    ref_comfy_name = comfy_client.upload_image(last_frame_bytes, filename=f"frame_ref_{step_i - 1}.png")
-                    frame_denoise = 0.38
+                # For subtle actions (idle, talk, look), anchor to master_reference or first frame to avoid cumulative drift
+                ref_bytes_to_use = (master_ref_bytes or last_frame_bytes) if is_subtle_action else last_frame_bytes
+                if ref_bytes_to_use:
+                    ref_comfy_name = comfy_client.upload_image(ref_bytes_to_use, filename=f"frame_ref_{step_i - 1}.png")
+                    frame_denoise = 0.28 if is_subtle_action else 0.35
 
             configured_wf = comfy_client.inject_parameters(
                 workflow=workflow,
@@ -832,7 +840,7 @@ def generate_asset(req: GenerateAssetRequest):
                 negative_prompt=context["negative_prompt"],
                 width=latent_w,
                 height=latent_h,
-                seed=seed + (step_i * 7 if step_i > 0 else 0),
+                seed=seed,  # Keep seed fixed across frames so lighting and facial features do not drift
                 steps=effective_steps,
                 cfg=effective_cfg,
                 checkpoint=req.checkpoint,
@@ -868,19 +876,131 @@ def generate_asset(req: GenerateAssetRequest):
             for rf in raw_frames
         ]
 
+    is_minimax = (
+        req.animation_engine == "minimax_h3"
+        or req.workflow_name == "character_i2v_minimax.json"
+        or "minimax" in (req.unet or "").lower()
+    )
+
+    def generate_minimax_frames() -> List[Image.Image]:
+        ref_bytes = master_ref_bytes
+        if not ref_bytes and char_id:
+            c_dir = proj_mgr.get_character_dir(req.project_name, char_id)
+            m_path = c_dir / "master_reference.png"
+            if m_path.exists():
+                ref_bytes = m_path.read_bytes()
+
+        if not ref_bytes:
+            raise ValueError("MiniMax H3 Reference-to-Video requires an existing character master reference image. Please generate or assign a master reference first.")
+
+        uploaded_name = comfy_client.upload_image(ref_bytes, filename=f"minimax_ref_{char_id or 'char'}.png")
+
+        wf_path = WORKFLOWS_DIR / "character_i2v_minimax.json"
+        with open(wf_path, "r", encoding="utf-8") as f:
+            wf = json.load(f)
+
+        wf["9001"] = {
+            "class_type": "LoadImage",
+            "inputs": {"image": uploaded_name}
+        }
+        wf["136"]["inputs"]["ref_images.ref_image_1"] = ["9001", 0]
+
+        action_name = req.action.replace("_", " ")
+        prompt_text = (
+            "subject_definitions:\n"
+            f"<Subject 1> is the character in <Picture 1>. {req.prompt}\n\n"
+            "detailed_description:\n"
+            f"[Shot 1]: A full body shot shows <Subject 1> performing a natural {action_name} movement. "
+            f"Natural posture, breathing, and subtle body motion, static locked camera, clean solid background, photorealistic textures."
+        )
+        wf["138"]["inputs"]["value"] = prompt_text
+
+        video_len = 1.0 if req.steps_count <= 8 else 1.5
+        wf["132"]["inputs"]["value"] = video_len
+
+        if req.perspective in ("full_body", "portrait"):
+            wf["115"]["inputs"]["aspect_ratio"] = "3:4 (Portrait Standard)"
+            wf["115"]["inputs"]["megapixels"] = 0.35
+        elif req.width > req.height:
+            wf["115"]["inputs"]["aspect_ratio"] = "16:9 (Widescreen)"
+            wf["115"]["inputs"]["megapixels"] = 0.35
+        else:
+            wf["115"]["inputs"]["aspect_ratio"] = "1:1 (Square)"
+            wf["115"]["inputs"]["megapixels"] = 0.35
+
+        wf["142"]["inputs"]["seed"] = seed
+
+        prefix = f"MiniMax_{req.asset_name}"
+        wf["9002"] = {
+            "class_type": "SaveImage",
+            "inputs": {
+                "filename_prefix": prefix,
+                "images": ["703", 0]
+            }
+        }
+
+        old_timeout = comfy_client.timeout
+        comfy_client.timeout = 600
+        try:
+            prompt_id = comfy_client.queue_prompt(wf)
+            raw_outputs = comfy_client.wait_for_completion(prompt_id)
+        finally:
+            comfy_client.timeout = old_timeout
+
+        frame_items = [item for item in raw_outputs if item[2] == "output" and item[0].endswith(".png")]
+        if not frame_items:
+            import glob
+            out_files = sorted(glob.glob(str(Path("D:/ComfyUI_windows_portable/ComfyUI/output") / f"{prefix}_*.png")))
+            if not out_files:
+                raise RuntimeError(f"MiniMax H3 did not produce any output frames for prefix {prefix}")
+            frame_bytes_list = [Path(fp).read_bytes() for fp in out_files]
+        else:
+            frame_bytes_list = [comfy_client.get_image_data(fn, subf, ftype) for fn, subf, ftype in frame_items]
+
+        import numpy as np
+        indices = np.linspace(0, len(frame_bytes_list) - 1, req.steps_count, dtype=int).tolist()
+        subsampled_bytes = [frame_bytes_list[i] for i in indices]
+
+        processed: List[Image.Image] = []
+        for idx, fb in enumerate(subsampled_bytes):
+            if req.remove_background:
+                try:
+                    clean_fb = comfy_client.remove_background_birefnet(fb)
+                    f_img = SpriteProcessor.load_image(clean_fb)
+                except Exception as b_err:
+                    logger.warning(f"BiRefNet failed on MiniMax frame {idx}: {b_err}")
+                    f_img = SpriteProcessor.load_image(fb)
+            else:
+                f_img = SpriteProcessor.load_image(fb)
+
+            resized = SpriteProcessor.resize_sprite(f_img, req.width, req.height, mode=req.scaling_mode)
+            processed.append(resized)
+
+        return processed
+
     # 3. Generate or mirror frames for all active directions
     directional_frames: Dict[str, List[Image.Image]] = {}
-    for d in active_directions:
-        dir_meta = persp_mgr.get_direction(d)
-        mirror_src = dir_meta.get("mirror_source") if dir_meta else None
+    if is_minimax and not use_mock:
+        logger.info(f"Using MiniMax H3 Reference-to-Video Engine for {req.asset_name} ({req.action})...")
+        try:
+            m_frames = generate_minimax_frames()
+            directional_frames[active_directions[0]] = m_frames
+        except Exception as me:
+            logger.error(f"MiniMax H3 generation failed: {me}. Falling back to 2D diffusion / mock.")
+            is_minimax = False
 
-        if req.mirror_symmetry and mirror_src and mirror_src in directional_frames:
-            logger.info(f"Auto-mirroring direction {d} horizontally from {mirror_src} (saving generation time).")
-            directional_frames[d] = [
-                SpriteProcessor.mirror_frame(f) for f in directional_frames[mirror_src]
-            ]
-        else:
-            logger.info(f"Generating frames for direction {d} ({req.action})...")
+    if not directional_frames:
+        for d in active_directions:
+            dir_meta = persp_mgr.get_direction(d)
+            mirror_src = dir_meta.get("mirror_source") if dir_meta else None
+
+            if req.mirror_symmetry and mirror_src and mirror_src in directional_frames:
+                logger.info(f"Auto-mirroring direction {d} horizontally from {mirror_src} (saving generation time).")
+                directional_frames[d] = [
+                    SpriteProcessor.mirror_frame(f) for f in directional_frames[mirror_src]
+                ]
+            else:
+                logger.info(f"Generating frames for direction {d} ({req.action})...")
             try:
                 d_frames = generate_direction_frames(d)
             except Exception as e:

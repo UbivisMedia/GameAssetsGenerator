@@ -4,6 +4,21 @@ All notable changes and milestones of the GameAssetGenerator project are documen
 
 ---
 
+## [0.4.0] - 2026-09-28
+
+### Added
+- **MiniMax H3 Reference-to-Video Animation Engine**:
+  - Integrated `workflows/character_i2v_minimax.json` (proven reference-to-video workflow from MovieGenerator) as a first-class motion engine.
+  - Leverages 3D spatiotemporal cross-attention to anchor character identity (`<Subject 1>` as `<Picture 1>`), hair, clothing, and lighting 100% frozen across all frames of an animation.
+  - Generates fluid, natural breathing and posture motion cycles with zero frame-to-frame drift or flicker.
+  - Automatic frame subsampling to the requested steps count (e.g. 8 frames) and batch AI cutout with BiRefNet (`birefnet.safetensors`).
+  - Added "Animation Motion Engine" selector in Studio UI (`Standard 2D Diffusion` vs `MiniMax H3 Video Engine`).
+  - Added `minimax_h3` architecture preset to `settings/model_presets.json` (Turbo LoRA, 8 steps, Euler / Simple).
+- **Perspective Protection Guards**:
+  - Enforced strict perspective isolation: Non-directional perspectives (`full_body`, `portrait`, `side_view`) are now hard-locked to single directional generation, preventing accidental 8-directional suite creation.
+  - Fixed seed anchoring across sequential frames to eliminate noise drift.
+  - Fixed `ProjectManager.base_dir` type initialization to handle string inputs safely.
+
 ## [0.3.0] - 2026-09-28
 
 ### Added

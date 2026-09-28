@@ -25,8 +25,8 @@ from .sprite_processor import SpriteProcessor
 
 
 class ProjectManager:
-    def __init__(self, output_base_dir: Optional[Path] = None):
-        self.base_dir = output_base_dir or (Path(__file__).resolve().parent.parent / "output")
+    def __init__(self, output_base_dir: Optional[Any] = None):
+        self.base_dir = Path(output_base_dir) if output_base_dir else (Path(__file__).resolve().parent.parent / "output")
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
     @staticmethod

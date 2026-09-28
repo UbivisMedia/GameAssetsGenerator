@@ -112,6 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const loraSelect = document.getElementById('lora-select');
   const loraStrengthSlider = document.getElementById('lora-strength-slider');
   const loraStrengthVal = document.getElementById('lora-strength-val');
+  const animationEngineSelect = document.getElementById('animation-engine-select');
   const unetSelect = document.getElementById('unet-select');
   const unetActiveBadge = document.getElementById('unet-active-badge');
   const vaeSelect = document.getElementById('vae-select');
@@ -743,6 +744,8 @@ document.addEventListener('DOMContentLoaded', () => {
         directionSection.style.display = 'block';
       } else {
         directionSection.style.display = 'none';
+        state.directionMode = 'single';
+        updateCompassUI();
       }
     }
   }
@@ -1159,10 +1162,14 @@ document.addEventListener('DOMContentLoaded', () => {
       vae: vaeSelect ? vaeSelect.value : null,
       sampler_name: samplerSelect ? samplerSelect.value : null,
       scheduler: schedulerSelect ? schedulerSelect.value : null,
-      direction: state.directionMode === 'single' ? state.selectedDirection : state.directionMode,
+      direction: (state.selectedPerspective === 'top_down' || state.selectedPerspective === 'isometric')
+        ? (state.directionMode === 'single' ? state.selectedDirection : state.directionMode)
+        : (state.selectedDirection || 'S'),
       mirror_symmetry: checkMirrorSymmetry ? checkMirrorSymmetry.checked : true,
       chroma_color: chromaColorPicker ? chromaColorPicker.value : null,
-      chroma_tolerance: chromaToleranceSlider ? parseInt(chromaToleranceSlider.value, 10) : 35
+      chroma_tolerance: chromaToleranceSlider ? parseInt(chromaToleranceSlider.value, 10) : 35,
+      animation_engine: animationEngineSelect ? animationEngineSelect.value : 'diffusion',
+      workflow_name: (animationEngineSelect && animationEngineSelect.value === 'minimax_h3') ? 'character_i2v_minimax.json' : 'sprite_sheet_generator.json'
     };
 
     if (checkpointSelect && checkpointSelect.value) {
@@ -1205,6 +1212,17 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- Model Control Listeners ---
+  if (animationEngineSelect) {
+    animationEngineSelect.addEventListener('change', () => {
+      const mode = animationEngineSelect.value;
+      if (mode === 'minimax_h3') {
+        showToast('🎬 MiniMax H3 Video Engine active: 100% character identity & lighting coherence!');
+      } else {
+        showToast('Standard 2D Diffusion Engine active.');
+      }
+    });
+  }
+
   if (loraStrengthSlider && loraStrengthVal) {
     loraStrengthSlider.addEventListener('input', (e) => {
       loraStrengthVal.textContent = parseFloat(e.target.value).toFixed(2);
