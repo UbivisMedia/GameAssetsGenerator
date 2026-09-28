@@ -1,0 +1,102 @@
+{
+  "actions": [
+    {
+      "id": "walk",
+      "name": "Walk (Walk Cycle)",
+      "default_steps": 4,
+      "allowed_steps": [2, 4, 6, 8],
+      "recommended_fps": 8,
+      "loop": true,
+      "step_descriptions": {
+        "2": ["Left foot forward, ground contact", "Right foot forward, ground contact"],
+        "4": ["Left contact pose", "Right leg passing pose", "Right contact pose", "Left leg passing pose"],
+        "6": ["Left heel strike", "Left push-off", "Right leg mid-swing", "Right heel strike", "Right push-off", "Left leg mid-swing"],
+        "8": ["Left heel contact", "Left foot flat recoil", "Left push-off", "Right knee high passing", "Right heel contact", "Right foot flat recoil", "Right push-off", "Left knee high passing"]
+      }
+    },
+    {
+      "id": "run",
+      "name": "Run (Run Cycle)",
+      "default_steps": 6,
+      "allowed_steps": [4, 6, 8],
+      "recommended_fps": 12,
+      "loop": true,
+      "step_descriptions": {
+        "4": ["Left full forward stride", "Airborne leap phase", "Right full forward stride", "Airborne leap phase"],
+        "6": ["Left foot contact forward lean", "Maximum leg drive push-off", "Mid-air flight phase", "Right foot contact forward lean", "Maximum leg drive push-off", "Mid-air flight phase"]
+      }
+    },
+    {
+      "id": "sit",
+      "name": "Sit Down (Sit Cycle)",
+      "default_steps": 4,
+      "allowed_steps": [3, 4, 5, 6],
+      "recommended_fps": 6,
+      "loop": false,
+      "step_descriptions": {
+        "3": ["Standing upright before seat", "Bending knees, lowering center of mass", "Fully seated in relaxed resting posture"],
+        "4": ["Standing posture", "Knees bending with arms balancing forward", "Deep crouch right above seating surface", "Comfortably seated with feet grounded"],
+        "6": ["Initial standing pose", "Weight shifting backward", "Knees flexed at 90 degrees", "First contact with seating surface", "Leaning back into rest", "Settled stable resting pose"]
+      }
+    },
+    {
+      "id": "jump",
+      "name": "Jump (Jump Cycle)",
+      "default_steps": 4,
+      "allowed_steps": [3, 4, 5, 6],
+      "recommended_fps": 8,
+      "loop": false,
+      "step_descriptions": {
+        "3": ["Crouch anticipation before takeoff", "Mid-air apex height with knees tucked", "Ground landing impact and recovery"],
+        "4": ["Anticipation squat crouch", "Full vertical body extension leaving the ground", "Apex zenith in mid-air with knees flexed", "Feet touching ground absorbing shock into squat"],
+        "5": ["Low preparatory squat", "Explosive thrust takeoff", "Ascending flight phase", "Apex peak suspension", "Impact shock absorption landing"]
+      }
+    },
+    {
+      "id": "idle",
+      "name": "Idle (Idle Stance)",
+      "default_steps": 4,
+      "allowed_steps": [2, 4, 6],
+      "recommended_fps": 4,
+      "loop": true,
+      "step_descriptions": {
+        "2": ["Relaxed stance exhale", "Slight body rise inhale"],
+        "4": ["Neutral combat ready stance", "Chest expanding slightly upward", "Maximum relaxed inhale apex", "Gentle descent back to neutral"]
+      }
+    },
+    {
+      "id": "attack",
+      "name": "Attack (Strike / Slash)",
+      "default_steps": 4,
+      "allowed_steps": [3, 4, 6],
+      "recommended_fps": 10,
+      "loop": false,
+      "step_descriptions": {
+        "3": ["Weapon wind-up backward", "Fast forward strike impact line", "Return to guard stance"],
+        "4": ["Anticipation and weapon draw", "Maximum forward acceleration thrust", "Full weapon extension and slash impact", "Recovery back to combat ready stance"]
+      }
+    },
+    {
+      "id": "talk",
+      "name": "Talk (Dialogue / Lip Sync)",
+      "default_steps": 4,
+      "allowed_steps": [2, 3, 4, 6],
+      "recommended_fps": 6,
+      "loop": true,
+      "step_descriptions": {
+        "2": ["Mouth closed resting", "Mouth open speaking"],
+        "3": ["Mouth closed neutral", "Mouth half-open vowel", "Mouth wide open talking"],
+        "4": ["Mouth closed neutral", "Mouth open speaking", "Mouth half-closed consonant", "Subtle eye blink relaxed"]
+      }
+    },
+    {
+      "id": "custom",
+      "name": "Custom (User Defined)",
+      "default_steps": 4,
+      "allowed_steps": [2, 3, 4, 5, 6, 8, 12, 16],
+      "recommended_fps": 8,
+      "loop": false,
+      "step_descriptions": {}
+    }
+  ]
+}

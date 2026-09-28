@@ -1,0 +1,46 @@
+{
+  "categories": [
+    {
+      "id": "characters",
+      "name": "Characters & Creatures",
+      "description": "Playable heroes, NPCs, monsters, companions, and bosses",
+      "default_animation": "walk",
+      "tags": ["hero", "enemy", "npc", "boss", "monster"]
+    },
+    {
+      "id": "items",
+      "name": "Items & Equipment",
+      "description": "Weapons, armor, potions, scrolls, relics, and loot",
+      "default_animation": "idle",
+      "tags": ["weapon", "armor", "potion", "relic", "currency"]
+    },
+    {
+      "id": "props",
+      "name": "Objects & Props",
+      "description": "Chests, barrels, lanterns, trees, rocks, and furniture",
+      "default_animation": "idle",
+      "tags": ["chest", "barrel", "furniture", "nature", "mechanism"]
+    },
+    {
+      "id": "tilesets",
+      "name": "Tiles & Environment",
+      "description": "Ground tiles, walls, platforms, roofs, water, and cliffs",
+      "default_animation": "none",
+      "tags": ["floor", "wall", "water", "cliff", "road"]
+    },
+    {
+      "id": "effects",
+      "name": "Effects & Spells",
+      "description": "Explosions, magic spells, smoke, sparks, and projectiles",
+      "default_animation": "attack",
+      "tags": ["explosion", "fireball", "slash", "magic", "smoke"]
+    },
+    {
+      "id": "ui",
+      "name": "UI & Icons",
+      "description": "Buttons, frames, badges, status indicators, and cursors",
+      "default_animation": "idle",
+      "tags": ["button", "icon", "frame", "gauge", "cursor"]
+    }
+  ]
+}

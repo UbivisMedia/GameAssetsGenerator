@@ -1,0 +1,32 @@
+{
+  "breakdowns": {
+    "walk": {
+      "keywords": ["contact pose", "down pose", "passing pose", "up pose"],
+      "side_view_cues": ["legs apart horizontal strides", "arms swinging counter-direction", "torso slight bobbing"],
+      "top_down_cues": ["shoulders alternating rotation", "feet visible peeking beneath clothing", "head facing movement direction"],
+      "isometric_cues": ["diagonal walking stride along 30 degree axis", "isometric ground contact", "depth occlusion of limbs"],
+      "portrait_cues": ["head bobbing with footsteps", "hair and collar swaying with movement momentum", "confident forward gaze"]
+    },
+    "sit": {
+      "keywords": ["standing stance", "anticipation knees flexing", "descending center of mass", "settled sitting pose"],
+      "side_view_cues": ["hips shifting back", "thighs horizontal", "back upright or slightly leaning"],
+      "top_down_cues": ["body profile condensing downward", "lap and knees visible", "shadow expanding beneath"],
+      "isometric_cues": ["isometric depth downward compression", "torso resting aligned with isometric seat angle"],
+      "portrait_cues": ["portrait lowering slightly in frame", "shoulders relaxing downward", "calm resting facial expression"]
+    },
+    "jump": {
+      "keywords": ["crouch anticipation", "thrust takeoff", "mid-air apex", "landing impact squash"],
+      "side_view_cues": ["knees bend low", "full vertical extension upward", "arms raised in air", "knees absorb landing on ground"],
+      "top_down_cues": ["shadow shrinks as sprite rises", "limbs tuck in air", "shadow enlarges on return"],
+      "isometric_cues": ["elevation above isometric ground plane", "diagonal trajectory", "contact with isometric tile grid"],
+      "portrait_cues": ["eyes wide with surprise/effort", "hair flying upward with wind inertia", "head tilting back during ascent"]
+    },
+    "talk": {
+      "keywords": ["mouth closed neutral", "mouth open talking", "mouth half-open speaking", "subtle blink"],
+      "side_view_cues": ["profile jaw movement", "speech posture"],
+      "top_down_cues": ["head turning gesture"],
+      "isometric_cues": ["isometric head angle with speech posture"],
+      "portrait_cues": ["jRPG dialogue lip sync frames", "expressive anime mouth shapes", "natural blinking eyes", "clean portrait frame"]
+    }
+  }
+}

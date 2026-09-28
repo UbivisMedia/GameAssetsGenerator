@@ -1,0 +1,607 @@
+"""
+GameAssetGenerator - Main Application Server
+FastAPI backend providing REST endpoints, static asset serving,
+and orchestration between ComfyUI, LM Studio, and the Sprite Engine.
+"""
+
+import json
+import logging
+import os
+import random
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+import uvicorn
+from PIL import Image, ImageDraw
+
+from lib.config_manager import ConfigManager
+from lib.comfy_client import ComfyClient
+from lib.lm_client import LMClient
+from lib.perspective_manager import PerspectiveManager
+from lib.sprite_processor import SpriteProcessor
+from lib.project_manager import ProjectManager
+from lib.module_manager import ModuleManager
+
+from version import __version__
+
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+logger = logging.getLogger("GameAssetGenerator")
+logger.setLevel(logging.INFO)
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+
+BASE_DIR = Path(__file__).resolve().parent
+WEB_DIR = BASE_DIR / "web"
+OUTPUT_DIR = BASE_DIR / "output"
+WORKFLOWS_DIR = BASE_DIR / "workflows"
+
+# Initialize subsystems
+config_mgr = ConfigManager(BASE_DIR)
+cfg = config_mgr.config
+comfy_client = ComfyClient(base_url=cfg.get("comfyui", {}).get("url", "http://127.0.0.1:8188"))
+lm_client = LMClient(base_url=cfg.get("lm_studio", {}).get("url", "http://127.0.0.1:1234/v1"))
+persp_mgr = PerspectiveManager(config_mgr.perspectives)
+proj_mgr = ProjectManager(OUTPUT_DIR)
+mod_mgr = ModuleManager(BASE_DIR / "modules")
+mod_mgr.discover_and_load_modules()
+app = FastAPI(title="GameAssetGenerator API", version="{__version__}")
+
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Register module custom routes if any
+mod_mgr.register_routes(app)
+
+@app.get("/favicon.ico")
+def favicon():
+    return Response(status_code=204)
+
+
+# Static file mounts
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+WEB_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/output", StaticFiles(directory=str(OUTPUT_DIR)), name="output")
+app.mount("/web", StaticFiles(directory=str(WEB_DIR)), name="web")
+
+
+# Pydantic Schemas
+class EnhancePromptRequest(BaseModel):
+    user_prompt: str
+    category: str
+    perspective: str
+    style_id: Optional[str] = "pixel_art_16bit"
+
+
+class PlanAnimationRequest(BaseModel):
+    asset_name: str
+    action: str
+    steps_count: int
+    perspective: str
+
+
+class GenerateAssetRequest(BaseModel):
+    project_name: str
+    rubrik: str
+    asset_name: str
+    prompt: str
+    negative_prompt: Optional[str] = ""
+    perspective: str
+    action: str
+    steps_count: int = 4
+    fps: int = 8
+    width: int = 64
+    height: int = 64
+    scaling_mode: str = "nearest"
+    workflow_name: Optional[str] = "sprite_sheet_generator.json"
+    seed: Optional[int] = None
+    steps: int = 25
+    cfg: float = 7.5
+    remove_background: bool = True
+    palette_mode: Optional[str] = None
+    mock_demo: bool = False
+    character_id: Optional[str] = None
+    character_name: Optional[str] = None
+    set_as_master: bool = False
+    use_character_reference: bool = True
+
+
+
+# API Routes
+@app.get("/")
+def read_root():
+    """Serves the main web application."""
+    index_file = WEB_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    return JSONResponse({"status": "GameAssetGenerator API is running. web/index.html not found."})
+
+
+@app.get("/api/status")
+def get_service_status():
+    """Checks health and availability of ComfyUI and LM Studio."""
+    return {
+        "comfyui": comfy_client.check_connection(),
+        "lm_studio": lm_client.check_connection(),
+        "loaded_modules_count": len(mod_mgr.modules)
+    }
+
+
+@app.get("/api/config")
+def get_system_config():
+    """Returns all configuration data, categories, perspectives, resolutions, and modules."""
+    config_mgr.reload_all()
+    # Read style presets
+    style_path = BASE_DIR / "prompts" / "style_presets.json"
+    styles = []
+    if style_path.exists():
+        try:
+            with open(style_path, "r", encoding="utf-8") as f:
+                styles = json.load(f).get("styles", [])
+        except Exception:
+            pass
+
+    return {
+        "config": config_mgr.config,
+        "categories": config_mgr.categories,
+        "perspectives": config_mgr.perspectives,
+        "resolutions": config_mgr.resolutions,
+        "animations": config_mgr.animations,
+        "styles": styles,
+        "modules": mod_mgr.list_modules()
+    }
+
+
+@app.get("/api/projects")
+def list_projects():
+    """Returns available projects and their categorized rubriken."""
+    projects = proj_mgr.list_projects()
+    result = []
+    for p in projects:
+        rubriken = proj_mgr.list_rubriken(p)
+        result.append({"name": p, "rubriken": rubriken})
+    return {"projects": result}
+
+
+@app.post("/api/projects/create")
+def create_project(data: Dict[str, str]):
+    project_name = data.get("project_name", "").strip()
+    rubrik = data.get("rubrik", "").strip()
+    if not project_name:
+        raise HTTPException(status_code=400, detail="Project name is required")
+    p_dir = proj_mgr.get_project_dir(project_name)
+    if rubrik:
+        proj_mgr.get_rubrik_dir(project_name, rubrik)
+    return {"status": "success", "project": project_name, "rubrik": rubrik}
+
+
+@app.get("/api/characters")
+def list_characters(project: Optional[str] = None):
+    """Lists all grouped characters and their animation suites in a project."""
+    if not project:
+        projects = proj_mgr.list_projects()
+        if not projects:
+            return {"characters": []}
+        project = projects[0]
+    chars = proj_mgr.list_characters(project)
+    return {"project": project, "characters": chars}
+
+
+@app.post("/api/characters/create")
+def create_character_endpoint(data: Dict[str, Any]):
+    """Pre-creates a character entity to group future animation phases."""
+    project_name = data.get("project_name", "DefaultProject")
+    name = data.get("name", "").strip()
+    character_id = data.get("character_id", "").strip() or ProjectManager.sanitize_name(name)
+    if not character_id:
+        raise HTTPException(status_code=400, detail="Character name or ID is required")
+
+    c_dir = proj_mgr.get_character_dir(project_name, character_id)
+    char_file = c_dir / "character.json"
+    char_data = {
+        "character_id": character_id,
+        "name": name or character_id.replace("_", " ").title(),
+        "project": project_name,
+        "perspective": data.get("perspective", "side_view"),
+        "base_prompt": data.get("base_prompt", ""),
+        "base_negative_prompt": data.get("base_negative_prompt", ""),
+        "seed": data.get("seed", -1),
+        "style_id": data.get("style_id", "pixel_art_16bit"),
+        "created_at": datetime.now().isoformat(),
+        "animations": {}
+    }
+    with open(char_file, "w", encoding="utf-8") as f:
+        json.dump(char_data, f, indent=2, ensure_ascii=False)
+
+    return {"status": "success", "character": char_data}
+
+
+@app.get("/api/assets")
+def list_assets(project: Optional[str] = None, rubrik: Optional[str] = None):
+
+    """Lists generated assets from the output directory."""
+    if not project:
+        projects = proj_mgr.list_projects()
+        if not projects:
+            return {"assets": []}
+        project = projects[0]
+    assets = proj_mgr.list_assets(project, rubrik)
+    return {"project": project, "assets": assets}
+
+
+@app.post("/api/lm/enhance-prompt")
+def enhance_prompt(req: EnhancePromptRequest):
+    """Enriches prompt via LM Studio or rule-based fallback."""
+    persp_data = persp_mgr.get_perspective(req.perspective)
+    # Style lookup
+    style_path = BASE_DIR / "prompts" / "style_presets.json"
+    style_prompt = "pixel art style"
+    if style_path.exists():
+        try:
+            with open(style_path, "r", encoding="utf-8") as f:
+                styles = json.load(f).get("styles", [])
+                for s in styles:
+                    if s.get("id") == req.style_id:
+                        style_prompt = s.get("prompt", style_prompt)
+                        break
+        except Exception:
+            pass
+
+    enhanced = lm_client.enhance_asset_prompt(
+        user_prompt=req.user_prompt,
+        category=req.category,
+        perspective_data=persp_data,
+        style_prompt=style_prompt
+    )
+    return enhanced
+
+
+@app.post("/api/lm/plan-animation")
+def plan_animation(req: PlanAnimationRequest):
+    """Generates animation step poses and descriptions."""
+    persp_data = persp_mgr.get_perspective(req.perspective)
+    act_data = config_mgr.get_animation_action(req.action)
+    templates = []
+    if act_data and "step_descriptions" in act_data:
+        templates = act_data["step_descriptions"].get(str(req.steps_count), [])
+
+    steps = lm_client.plan_animation_steps(
+        asset_name=req.asset_name,
+        action=req.action,
+        steps_count=req.steps_count,
+        perspective_data=persp_data,
+        step_templates=templates
+    )
+    return {"action": req.action, "steps_count": req.steps_count, "steps": steps}
+
+
+def create_mock_sprite_frame(
+    width: int,
+    height: int,
+    perspective: str,
+    action: str,
+    step_idx: int,
+    total_steps: int,
+    asset_name: str
+) -> Image.Image:
+    """
+    Creates an authentic, stylized placeholder game sprite for instant testing
+    when ComfyUI is not currently generating or in mock mode.
+    """
+    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    # Base silhouette color
+    color_palette = [
+        (66, 135, 245), (235, 87, 87), (39, 174, 96),
+        (242, 153, 74), (155, 81, 224), (45, 156, 219)
+    ]
+    primary_color = color_palette[hash(asset_name) % len(color_palette)]
+
+    cx, cy = width // 2, height // 2
+    r = min(width, height) // 4
+
+    # Animation offset
+    phase = (step_idx / max(1, total_steps)) * 6.283
+    import math
+    bob_y = int(math.sin(phase) * (height * 0.08))
+    stride_x = int(math.cos(phase) * (width * 0.12))
+
+    if perspective == "isometric":
+        # Draw isometric diamond base
+        iso_w = width * 0.6
+        iso_h = iso_w * 0.5
+        top = (cx, cy + height * 0.15)
+        right = (cx + iso_w / 2, cy + height * 0.15 + iso_h / 2)
+        bottom = (cx, cy + height * 0.15 + iso_h)
+        left = (cx - iso_w / 2, cy + height * 0.15 + iso_h / 2)
+        draw.polygon([top, right, bottom, left], fill=(220, 220, 220, 180), outline=(100, 100, 100, 255))
+        # Draw character elevated
+        char_y = cy - int(height * 0.1) + bob_y
+        draw.ellipse([cx - r, char_y - r, cx + r, char_y + r], fill=primary_color, outline=(255, 255, 255, 255))
+    elif perspective == "top_down":
+        # Draw top-down circular head and shoulder nubs
+        draw.ellipse([cx - r - 4, cy - r + bob_y, cx + r + 4, cy + r + bob_y], fill=(40, 40, 40, 200))
+        draw.ellipse([cx - r, cy - r + bob_y, cx + r, cy + r + bob_y], fill=primary_color, outline=(255, 255, 255, 255))
+        # Foot step indicator
+        draw.ellipse([cx - r + stride_x, cy + r + bob_y, cx - r + stride_x + 6, cy + r + bob_y + 6], fill=(240, 240, 240, 255))
+    elif perspective == "portrait":
+        # Draw jRPG dialogue bust portrait
+        bust_y = int(height * 0.65)
+        # Shoulders / tunic
+        draw.polygon([
+            (int(width * 0.15), height),
+            (int(width * 0.35), bust_y),
+            (int(width * 0.65), bust_y),
+            (int(width * 0.85), height)
+        ], fill=primary_color, outline=(20, 20, 20, 255))
+        # Neck
+        neck_w = int(width * 0.15)
+        draw.rectangle([cx - neck_w, bust_y - int(height * 0.1), cx + neck_w, bust_y], fill=(245, 215, 185, 255))
+        # Face / Head
+        face_r = int(min(width, height) * 0.28)
+        head_cy = int(height * 0.4) + (bob_y // 2)
+        draw.ellipse([cx - face_r, head_cy - face_r, cx + face_r, head_cy + face_r], fill=(250, 225, 200, 255), outline=(30, 30, 30, 255))
+        # Hair locks
+        draw.arc([cx - face_r - 2, head_cy - face_r - 4, cx + face_r + 2, head_cy], 180, 360, fill=primary_color, width=max(2, int(face_r * 0.4)))
+        # Eyes
+        eye_y = head_cy - int(face_r * 0.1)
+        eye_spacing = int(face_r * 0.45)
+        blink = (step_idx == total_steps - 1) and (action in ('talk', 'idle', 'walk'))
+        if blink:
+            draw.line([(cx - eye_spacing - 4, eye_y), (cx - eye_spacing + 4, eye_y)], fill=(30, 30, 30, 255), width=2)
+            draw.line([(cx + eye_spacing - 4, eye_y), (cx + eye_spacing + 4, eye_y)], fill=(30, 30, 30, 255), width=2)
+        else:
+            draw.ellipse([cx - eye_spacing - 3, eye_y - 4, cx - eye_spacing + 3, eye_y + 4], fill=(30, 30, 30, 255))
+            draw.ellipse([cx + eye_spacing - 3, eye_y - 4, cx + eye_spacing + 3, eye_y + 4], fill=(30, 30, 30, 255))
+        # Mouth
+        mouth_y = head_cy + int(face_r * 0.5)
+        mouth_open = (step_idx % 2 == 1) if action == 'talk' else False
+        if mouth_open:
+            draw.ellipse([cx - 4, mouth_y - 3, cx + 4, mouth_y + 3], fill=(180, 50, 50, 255), outline=(30, 30, 30, 255))
+        else:
+            draw.line([(cx - 4, mouth_y), (cx + 4, mouth_y)], fill=(120, 50, 50, 255), width=2)
+    else: # side_view
+        # Side view with leg movement
+        ground_y = int(height * 0.85)
+        draw.line([(0, ground_y), (width, ground_y)], fill=(120, 120, 120, 200), width=1)
+        body_y = cy + bob_y
+        draw.rectangle([cx - r // 2, body_y - r, cx + r // 2, body_y + r], fill=primary_color, outline=(20, 20, 20, 255))
+        # Head
+        head_r = r // 2
+        draw.ellipse([cx - head_r, body_y - r - head_r * 2, cx + head_r, body_y - r], fill=(245, 215, 185, 255), outline=(20, 20, 20, 255))
+        # Legs
+        draw.line([(cx - 4, body_y + r), (cx - 4 + stride_x, ground_y)], fill=(30, 30, 30, 255), width=2)
+        draw.line([(cx + 4, body_y + r), (cx + 4 - stride_x, ground_y)], fill=(60, 60, 60, 255), width=2)
+
+    return img
+
+
+@app.post("/api/generate")
+def generate_asset(req: GenerateAssetRequest):
+    """
+    Main orchestration endpoint for asset generation.
+    Connects modules, prompt preparation, ComfyUI execution, frame extraction,
+    transparency, scaling, packing, and project storage.
+    """
+    logger.info(f"Generating asset: {req.asset_name} in {req.project_name}/{req.rubrik}")
+
+    # Check if this generation belongs to a grouped character
+    char_data = None
+    char_id = req.character_id
+    if not char_id and req.rubrik == "characters":
+        char_id = ProjectManager.sanitize_name(req.asset_name.split("_")[0])
+
+    if char_id and req.rubrik == "characters":
+        char_data = proj_mgr.get_character(req.project_name, char_id)
+
+    seed = req.seed if (req.seed is not None and req.seed > 0) else random.randint(1, 2147483647)
+    
+    # Inherit master seed if user selected character reference and didn't specify seed
+    if char_data and req.use_character_reference and (req.seed is None or req.seed <= 0):
+        if char_data.get("seed", -1) > 0:
+            seed = char_data["seed"]
+
+    persp_data = persp_mgr.get_perspective(req.perspective)
+
+    # Prompt synthesis: If character exists, anchor with base character description
+    effective_prompt = req.prompt
+    if char_data and req.use_character_reference:
+        base_p = char_data.get("base_prompt", "")
+        if base_p and base_p.lower() not in effective_prompt.lower():
+            effective_prompt = f"{base_p}, {effective_prompt}"
+
+    # 1. Run module prompt prepare hook
+    context = {
+        "project": req.project_name,
+        "rubrik": req.rubrik,
+        "category": req.rubrik,
+        "asset_name": req.asset_name,
+        "character_id": char_id,
+        "character_name": req.character_name or (char_data.get("name") if char_data else None),
+        "perspective": req.perspective,
+        "action": req.action,
+        "steps": req.steps_count,
+        "width": req.width,
+        "height": req.height,
+        "fps": req.fps,
+        "seed": seed,
+        "positive_prompt": effective_prompt,
+        "negative_prompt": req.negative_prompt or "",
+        "palette_mode": req.palette_mode
+    }
+    context = mod_mgr.run_prompt_prepare(context)
+
+    # 2. Check ComfyUI or fallback to mock demo if requested or offline
+    comfy_status = comfy_client.check_connection()
+    use_mock = req.mock_demo or (not comfy_status.get("online", False))
+
+    frames: List[Image.Image] = []
+
+    if use_mock:
+        logger.info("Using mock generation pipeline (ComfyUI offline or mock requested).")
+        for step_idx in range(req.steps_count):
+            frame = create_mock_sprite_frame(
+                width=req.width,
+                height=req.height,
+                perspective=req.perspective,
+                action=req.action,
+                step_idx=step_idx,
+                total_steps=req.steps_count,
+                asset_name=req.asset_name
+            )
+            frames.append(frame)
+    else:
+        # Load and configure ComfyUI workflow
+        wf_path = WORKFLOWS_DIR / (req.workflow_name or "sprite_sheet_generator.json")
+        if not wf_path.exists():
+            wf_path = WORKFLOWS_DIR / "pixel_asset_single.json"
+
+        with open(wf_path, "r", encoding="utf-8") as f:
+            workflow_template = json.load(f)
+
+        # Let modules modify workflow
+        workflow = mod_mgr.run_workflow_prepare(workflow_template, context)
+
+        # Inject generation parameters
+        latent_w = 1024 if req.steps_count > 1 else 512
+        latent_h = 512 // (req.steps_count if req.steps_count > 4 else 1)
+        latent_h = max(256, min(512, latent_h))
+
+        configured_wf = comfy_client.inject_parameters(
+            workflow=workflow,
+            positive_prompt=context["positive_prompt"],
+            negative_prompt=context["negative_prompt"],
+            width=latent_w,
+            height=latent_h,
+            seed=seed,
+            steps=req.steps,
+            cfg=req.cfg
+        )
+
+        try:
+            prompt_id = comfy_client.queue_prompt(configured_wf)
+            image_outputs = comfy_client.wait_for_completion(prompt_id)
+            if not image_outputs:
+                raise RuntimeError("ComfyUI did not return any output images.")
+
+            # Download first output image
+            fn, subf, ftype = image_outputs[0]
+            raw_bytes = comfy_client.get_image_data(fn, subf, ftype)
+            master_img = SpriteProcessor.load_image(raw_bytes)
+
+            # Slicing if multi-step strip
+            if req.steps_count > 1:
+                frames = SpriteProcessor.slice_strip(
+                    master_img,
+                    num_frames=req.steps_count,
+                    target_width=req.width,
+                    target_height=req.height,
+                    scaling_mode=req.scaling_mode
+                )
+            else:
+                resized = SpriteProcessor.resize_sprite(
+                    master_img,
+                    req.width,
+                    req.height,
+                    mode=req.scaling_mode
+                )
+                frames = [resized]
+
+        except Exception as e:
+            logger.error(f"ComfyUI execution failed: {e}. Falling back to demo preview.")
+            for step_idx in range(req.steps_count):
+                frames.append(create_mock_sprite_frame(
+                    width=req.width,
+                    height=req.height,
+                    perspective=req.perspective,
+                    action=req.action,
+                    step_idx=step_idx,
+                    total_steps=req.steps_count,
+                    asset_name=req.asset_name
+                ))
+
+    # 3. Postprocessing hook
+    frames = mod_mgr.run_postprocess(frames, context)
+
+    # 4. Save into structured project directory
+    metadata_payload = {
+        "perspective": req.perspective,
+        "perspective_name": persp_data.get("name", req.perspective),
+        "action": req.action,
+        "steps_count": req.steps_count,
+        "resolution": {"width": req.width, "height": req.height},
+        "scaling_mode": req.scaling_mode,
+        "positive_prompt": context["positive_prompt"],
+        "negative_prompt": context["negative_prompt"],
+        "seed": seed,
+        "is_mock": use_mock,
+        "workflow": req.workflow_name
+    }
+
+    if req.rubrik == "characters" or char_id:
+        c_id = char_id or ProjectManager.sanitize_name(req.asset_name)
+        c_name = req.character_name or (char_data.get("name") if char_data else c_id.replace("_", " ").title())
+        result = proj_mgr.save_character_animation(
+            project_name=req.project_name,
+            character_id=c_id,
+            character_name=c_name,
+            action=req.action,
+            frames=frames,
+            metadata=metadata_payload,
+            fps=req.fps,
+            make_transparent=req.remove_background,
+            set_as_master=req.set_as_master
+        )
+    else:
+        result = proj_mgr.save_asset(
+            project_name=req.project_name,
+            rubrik=req.rubrik,
+            asset_name=req.asset_name,
+            frames=frames,
+            metadata=metadata_payload,
+            fps=req.fps,
+            make_transparent=req.remove_background
+        )
+
+    return {"status": "success", "asset": result}
+
+
+
+if __name__ == "__main__":
+    import socket
+    server_cfg = cfg.get("server", {})
+    host = server_cfg.get("host", "127.0.0.1")
+    desired_port = server_cfg.get("port", 7865)
+
+    def find_free_port(start_port: int, max_attempts: int = 10) -> int:
+        for p in range(start_port, start_port + max_attempts):
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                if s.connect_ex((host, p)) != 0:
+                    return p
+        return start_port
+
+    port = find_free_port(desired_port)
+    print(f"\n========================================================", flush=True)
+    print(f"  GameAssetGenerator Studio ({__version__}) starting on http://{host}:{port}", flush=True)
+    print(f"========================================================\n", flush=True)
+    uvicorn.run(
+        "main:app",
+        host=host,
+        port=port,
+        reload=False,
+        access_log=False,
+        log_level="warning"
+    )
+
+

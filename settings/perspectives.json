@@ -1,0 +1,48 @@
+{
+  "perspectives": [
+    {
+      "id": "side_view",
+      "name": "Side-View",
+      "badge": "2D Platformer",
+      "icon": "bi-arrows-expand-vertical",
+      "description": "Classic 2D side-scrolling profile for platformers, beat 'em ups, and metroidvanias.",
+      "prompt_prefix": "side view 2D game asset, horizontal profile perspective, platformer game style, flat ground level",
+      "negative_prompt": "top-down, bird's eye view, isometric angle, high angle shot, perspective tilt, 3D render angle",
+      "aspect_ratio": "1:1",
+      "ideal_for": ["characters", "items", "props", "tilesets"]
+    },
+    {
+      "id": "top_down",
+      "name": "Top-Down",
+      "badge": "Classic RPG / Strategy",
+      "icon": "bi-arrow-down-circle",
+      "description": "Orthogonal bird's-eye view (90° or slight 75-80° pitch) for classic 2D RPGs, RTS, and action-adventures.",
+      "prompt_prefix": "top-down view game sprite, orthogonal top-down perspective, birds eye view RPG asset, seen from above",
+      "negative_prompt": "side view, horizontal eye level, extreme perspective, horizon line, worm's eye view, ceiling",
+      "aspect_ratio": "1:1",
+      "ideal_for": ["characters", "tilesets", "props", "vehicles"]
+    },
+    {
+      "id": "isometric",
+      "name": "Isometric",
+      "badge": "2.5D Dimetric",
+      "icon": "bi-box",
+      "description": "2.5D isometric view (30°/45° angle, true 2:1 dimetric projection) for tactical RPGs and city builders.",
+      "prompt_prefix": "isometric 2.5D game asset, dimetric projection 30 degree angle, sharp isometric grid alignment, clean diagonal edges",
+      "negative_prompt": "straight side view, flat top-down, fisheye perspective, distorted horizon, wide angle lens",
+      "aspect_ratio": "1:1",
+      "ideal_for": ["characters", "props", "buildings", "tilesets"]
+    },
+    {
+      "id": "portrait",
+      "name": "Portrait / Dialog",
+      "badge": "jRPG / Visual Novel",
+      "icon": "bi-person-badge",
+      "description": "Close-up bust or half-body portrait for dialogue boxes, menu status screens, and jRPG cutscenes.",
+      "prompt_prefix": "jRPG character portrait bust, visual novel dialogue avatar, high quality face and shoulders, expressive eyes and hair, centered headshot, clean solid background",
+      "negative_prompt": "full body, tiny sprite, feet visible, platformer angle, overhead map, blurry face, cropped hair",
+      "aspect_ratio": "1:1",
+      "ideal_for": ["characters", "ui"]
+    }
+  ]
+}

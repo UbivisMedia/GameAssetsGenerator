@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GameAssetGenerator - 2D & Isometric Sprite Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300f0ff'><polygon points='12 2 2 7 12 12 22 7 12 2'/><polyline points='2 17 12 22 22 17'/><polyline points='2 12 12 17 22 12'/></svg>">
+  <link rel="stylesheet" href="/web/css/style.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">GameAssetGenerator</h1>
+          <span class="brand-subtitle">Side-View • Top-Down • Isometric • Portrait Studio</span>
+        </div>
+      </div>
+
+      <!-- Service Status Badges -->
+      <div class="header-status">
+        <div id="status-comfyui" class="status-pill status-checking" title="ComfyUI Connection Status">
+          <span class="status-dot"></span>
+          <span class="status-label">ComfyUI: Checking...</span>
+        </div>
+        <div id="status-lmstudio" class="status-pill status-checking" title="LM Studio Connection Status">
+          <span class="status-dot"></span>
+          <span class="status-label">LM Studio: Checking...</span>
+        </div>
+        <button id="btn-refresh-status" class="icon-button" title="Refresh service connections">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6"></path>
+            <path d="M1 20v-6h6"></path>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace Grid -->
+    <main class="main-container">
+      <!-- Left Panel: Controls & Generator Settings -->
+      <section class="panel control-panel">
+        <!-- Project & Destination Section -->
+        <div class="card section-card">
+          <div class="card-header">
+            <span class="card-icon">📁</span>
+            <h2>Project & Category</h2>
+          </div>
+          <div class="form-grid two-cols">
+            <div class="form-group">
+              <label for="project-select">Project</label>
+              <div class="input-with-action">
+                <select id="project-select" class="form-input"></select>
+                <button id="btn-new-project" class="mini-btn" title="Create New Project">+</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="rubrik-select">Category</label>
+              <select id="rubrik-select" class="form-input"></select>
+            </div>
+          </div>
+
+          <!-- Character Entity Grouping (Visible for Characters Category) -->
+          <div id="character-group-section" class="form-group mt-2">
+            <div class="flex-between">
+              <label for="character-select">Character Entity (Master Group)</label>
+              <span class="badge">Character-Centric</span>
+            </div>
+            <div class="input-with-action">
+              <select id="character-select" class="form-input">
+                <option value="">-- Standalone Asset / Auto-Create --</option>
+              </select>
+              <button id="btn-new-character" class="mini-btn" title="Create New Character Group">+</button>
+            </div>
+
+            <!-- Active Character Master Anchor Box -->
+            <div id="character-anchor-box" class="character-anchor-card mt-2" style="display: none;">
+              <div class="anchor-thumb">
+                <img id="character-master-thumb" src="" alt="Master Reference">
+              </div>
+              <div class="anchor-info">
+                <div class="anchor-name" id="character-anchor-name">Character Name</div>
+                <div class="anchor-badges">
+                  <span class="badge" id="character-anchor-perspective">Perspective</span>
+                  <span class="badge" id="character-anchor-anims">0 Animations</span>
+                </div>
+                <label class="checkbox-inline mt-1">
+                  <input type="checkbox" id="check-use-character-ref" checked>
+                  Anchor all animations to this Master Asset
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group mt-2">
+            <label for="asset-name">Asset / Animation Name</label>
+            <input type="text" id="asset-name" class="form-input font-mono" placeholder="e.g. knight_walk_cycle">
+          </div>
+        </div>
+
+        <!-- Perspective Selector -->
+        <div class="card section-card">
+          <div class="card-header">
+            <span class="card-icon">📐</span>
+            <h2>Perspective</h2>
+          </div>
+          <div class="perspective-cards" id="perspective-container">
+            <div class="perspective-card active" data-perspective="side_view">
+              <div class="persp-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 12h18M3 6h18M3 18h18"></path>
+                </svg>
+              </div>
+              <div class="persp-meta">
+                <span class="persp-name">Side-View</span>
+                <span class="persp-badge">2D Platformer</span>
+              </div>
+            </div>
+
+            <div class="perspective-card" data-perspective="top_down">
+              <div class="persp-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <circle cx="12" cy="12" r="4"></circle>
+                </svg>
+              </div>
+              <div class="persp-meta">
+                <span class="persp-name">Top-Down</span>
+                <span class="persp-badge">Classic RPG / RTS</span>
+              </div>
+            </div>
+
+            <div class="perspective-card" data-perspective="isometric">
+              <div class="persp-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2l10 5.5v11L12 24 2 18.5v-11L12 2z"></path>
+                  <path d="M12 24V13M2 7.5l10 5.5 10-5.5"></path>
+                </svg>
+              </div>
+              <div class="persp-meta">
+                <span class="persp-name">Isometric</span>
+                <span class="persp-badge">2.5D Dimetric</span>
+              </div>
+            </div>
+
+            <div class="perspective-card" data-perspective="portrait">
+              <div class="persp-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+              </div>
+              <div class="persp-meta">
+                <span class="persp-name">Portrait</span>
+                <span class="persp-badge">jRPG / Dialog</span>
+              </div>
+            </div>
+          </div>
+          <p id="perspective-description" class="help-text mt-2"></p>
+        </div>
+
+        <!-- Size & Resolution Settings -->
+        <div class="card section-card">
+          <div class="card-header">
+            <span class="card-icon">📏</span>
+            <h2>Size & Resolution</h2>
+          </div>
+          <div class="presets-row" id="resolution-presets"></div>
+          <div class="form-grid three-cols mt-2">
+            <div class="form-group">
+              <label for="width-input">Width (px)</label>
+              <input type="number" id="width-input" class="form-input font-mono" value="64" min="8" max="1024" step="8">
+            </div>
+            <div class="form-group">
+              <label for="height-input">Height (px)</label>
+              <input type="number" id="height-input" class="form-input font-mono" value="64" min="8" max="1024" step="8">
+            </div>
+            <div class="form-group">
+              <label for="scaling-mode">Filter</label>
+              <select id="scaling-mode" class="form-input">
+                <option value="nearest">Nearest Neighbor (Pixel-Art)</option>
+                <option value="bilinear">Bilinear</option>
+                <option value="lanczos">Lanczos (HD)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Animation Phases & Steps -->
+        <div class="card section-card">
+          <div class="card-header">
+            <span class="card-icon">⚡</span>
+            <h2>Animation Phases & Steps</h2>
+          </div>
+          <div class="form-group">
+            <label>Motion / Action</label>
+            <div class="action-buttons-grid" id="action-buttons"></div>
+          </div>
+          <div class="form-grid two-cols mt-2">
+            <div class="form-group">
+              <label for="steps-slider">
+                Animation Steps (Frames): <strong id="steps-val-display" class="neon-text">4</strong>
+              </label>
+              <input type="range" id="steps-slider" min="1" max="16" value="4" class="form-range">
+            </div>
+            <div class="form-group">
+              <label for="fps-input">Preview FPS</label>
+              <input type="number" id="fps-input" class="form-input font-mono" value="8" min="1" max="60">
+            </div>
+          </div>
+
+          <!-- Step breakdown container -->
+          <div class="step-breakdown-wrapper mt-2">
+            <div class="flex-between">
+              <span class="sub-label">Planned Frame Sequence:</span>
+              <button id="btn-lm-plan" class="text-button-ai">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+                </svg>
+                AI Keyframe Plan (LM Studio)
+              </button>
+            </div>
+            <div id="steps-breakdown-list" class="steps-breakdown-list"></div>
+          </div>
+        </div>
+
+        <!-- Prompt & AI Enhancement -->
+        <div class="card section-card">
+          <div class="card-header">
+            <span class="card-icon">🎨</span>
+            <h2>Prompt & Visual Style</h2>
+          </div>
+          <div class="form-group">
+            <label for="style-select">Art Style</label>
+            <select id="style-select" class="form-input"></select>
+          </div>
+          <div class="form-group mt-2">
+            <div class="flex-between">
+              <label for="prompt-input">Asset Description (Prompt)</label>
+              <button id="btn-enhance-prompt" class="text-button-ai">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                </svg>
+                Enhance with AI
+              </button>
+            </div>
+            <textarea id="prompt-input" class="form-textarea" rows="3" placeholder="e.g. Heroic knight in heavy steel plate armor with a broadsword"></textarea>
+          </div>
+
+          <details class="advanced-details mt-2">
+            <summary>Advanced ComfyUI Parameters</summary>
+            <div class="form-group mt-2">
+              <label for="negative-prompt">Negative Prompt</label>
+              <textarea id="negative-prompt" class="form-textarea" rows="2" placeholder="blurry, distorted, photorealistic, 3d render"></textarea>
+            </div>
+            <div class="form-grid three-cols mt-2">
+              <div class="form-group">
+                <label for="seed-input">Seed (-1 = Random)</label>
+                <input type="number" id="seed-input" class="form-input font-mono" value="-1">
+              </div>
+              <div class="form-group">
+                <label for="comfy-steps">Inference Steps</label>
+                <input type="number" id="comfy-steps" class="form-input font-mono" value="25" min="10" max="60">
+              </div>
+              <div class="form-group">
+                <label for="cfg-input">CFG Scale</label>
+                <input type="number" id="cfg-input" class="form-input font-mono" value="7.5" step="0.5" min="1" max="20">
+              </div>
+            </div>
+            <div class="form-check mt-2">
+              <input type="checkbox" id="check-rembg" checked>
+              <label for="check-rembg">Automatically cut out transparent background</label>
+            </div>
+          </details>
+        </div>
+
+        <!-- Generate Buttons -->
+        <div class="generate-actions">
+          <button id="btn-generate" class="primary-btn pulse-glow">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            Generate Asset
+          </button>
+          <button id="btn-generate-mock" class="secondary-btn" title="Instant preview test without GPU inference delay">
+            ⚡ Mock / Demo Preview
+          </button>
+        </div>
+      </section>
+
+      <!-- Right Panel: Live Preview, Spritesheet Viewer, Export & Gallery -->
+      <section class="panel preview-panel">
+        <!-- View Mode Navigation Tabs -->
+        <div class="tabs-header">
+          <button class="tab-btn active" data-tab="tab-player">🎬 Animation Preview</button>
+          <button class="tab-btn" data-tab="tab-spritesheet">📜 Spritesheet</button>
+          <button class="tab-btn" data-tab="tab-frames">🖼️ Individual Frames</button>
+          <button class="tab-btn" data-tab="tab-gallery">🗃️ Project Gallery</button>
+        </div>
+
+        <!-- Tab 1: Interactive Animation Player -->
+        <div id="tab-player" class="tab-content active">
+          <div class="preview-stage-wrapper">
+            <div class="stage-toolbar">
+              <div class="zoom-controls">
+                <span>Zoom:</span>
+                <button class="zoom-btn" data-zoom="1">1x</button>
+                <button class="zoom-btn" data-zoom="2">2x</button>
+                <button class="zoom-btn active" data-zoom="4">4x</button>
+                <button class="zoom-btn" data-zoom="8">8x</button>
+              </div>
+              <div class="stage-options">
+                <button id="btn-toggle-grid" class="tool-btn active" title="Toggle Transparency Checkerboard">🏁</button>
+                <button id="btn-toggle-bounds" class="tool-btn" title="Toggle Sprite Bounds Box">📐</button>
+              </div>
+            </div>
+
+            <!-- Canvas / Sprite Viewport -->
+            <div class="sprite-viewport checkerboard" id="sprite-viewport">
+              <div id="sprite-container" class="sprite-container zoom-4x">
+                <img id="active-frame-img" src="" alt="Active Frame" style="display: none;">
+                <div id="empty-state" class="empty-state">
+                  <div class="empty-icon">🎮</div>
+                  <h3>No Asset Generated Yet</h3>
+                  <p>Choose perspective, resolution, and animation steps on the left, then click <strong>Generate Asset</strong> or <strong>Mock Preview</strong>.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Player Controls -->
+            <div class="player-controls">
+              <div class="playback-buttons">
+                <button id="btn-step-prev" class="player-btn" title="Previous Frame">⏮️</button>
+                <button id="btn-play-pause" class="player-btn play-btn" title="Play / Pause">▶️</button>
+                <button id="btn-step-next" class="player-btn" title="Next Frame">⏭️</button>
+              </div>
+              <div class="frame-indicator">
+                Frame: <span id="current-frame-idx" class="neon-text">0</span> / <span id="total-frames-count">0</span>
+              </div>
+              <div class="speed-slider-group">
+                <label for="player-fps-slider">Speed: <span id="player-fps-display">8</span> FPS</label>
+                <input type="range" id="player-fps-slider" min="1" max="30" value="8" class="form-range mini">
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Export Bar -->
+          <div class="export-card card mt-3" id="export-card" style="display: none;">
+            <h3>📦 Export & Engine Integration</h3>
+            <div class="export-buttons-grid">
+              <a id="download-spritesheet" class="export-btn" download>
+                <span>📜 Spritesheet PNG</span>
+              </a>
+              <a id="download-gif" class="export-btn" download>
+                <span>🎬 Animated GIF</span>
+              </a>
+              <a id="download-webp" class="export-btn" download>
+                <span>🌐 Animated WebP</span>
+              </a>
+              <a id="download-metadata" class="export-btn" download>
+                <span>📄 Godot/Unity JSON</span>
+              </a>
+            </div>
+            <div class="output-path-badge mt-2">
+              <span>Saved in: </span>
+              <code id="output-saved-path"></code>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Spritesheet View -->
+        <div id="tab-spritesheet" class="tab-content">
+          <div class="spritesheet-container checkerboard" id="spritesheet-viewer">
+            <img id="spritesheet-full-img" src="" alt="Full Spritesheet" style="display: none;">
+            <p id="spritesheet-empty" class="text-muted">No spritesheet available yet.</p>
+          </div>
+        </div>
+
+        <!-- Tab 3: Individual Frames Strip -->
+        <div id="tab-frames" class="tab-content">
+          <div class="frames-strip-grid" id="frames-strip-grid">
+            <p class="text-muted">No individual frames loaded.</p>
+          </div>
+        </div>
+
+        <!-- Tab 4: Project Asset Gallery -->
+        <div id="tab-gallery" class="tab-content">
+          <div class="gallery-filter-bar">
+            <select id="gallery-rubrik-filter" class="form-input mini">
+              <option value="">All Categories</option>
+            </select>
+            <button id="btn-refresh-gallery" class="secondary-btn mini">Refresh</button>
+          </div>
+          <div class="gallery-grid" id="gallery-grid">
+            <p class="text-muted">No assets found in the current project.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Modals -->
+    <div id="modal-new-project" class="modal-backdrop" style="display: none;">
+      <div class="modal-dialog">
+        <h3>Create New Project</h3>
+        <div class="form-group mt-2">
+          <label for="new-project-input">Project Name</label>
+          <input type="text" id="new-project-input" class="form-input" placeholder="MyAwesomeGame">
+        </div>
+        <div class="modal-actions mt-3">
+          <button id="btn-modal-cancel" class="secondary-btn">Cancel</button>
+          <button id="btn-modal-confirm" class="primary-btn">Create Project</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal New Character -->
+    <div id="modal-new-character" class="modal-backdrop" style="display: none;">
+      <div class="modal-dialog">
+        <h3>Create New Character Group</h3>
+        <p class="help-text">This will create a base character entity to group and anchor all animation phases (walk, sit, jump, etc.).</p>
+        <div class="form-group mt-2">
+          <label for="new-character-name">Character Name</label>
+          <input type="text" id="new-character-name" class="form-input" placeholder="e.g. Knight Arthur">
+        </div>
+        <div class="form-group mt-2">
+          <label for="new-character-prompt">Base Appearance Prompt</label>
+          <textarea id="new-character-prompt" class="form-textarea" rows="2" placeholder="e.g. heroic knight in steel plate armor with blue flowing cape"></textarea>
+        </div>
+        <div class="modal-actions mt-3">
+          <button id="btn-modal-char-cancel" class="secondary-btn">Cancel</button>
+          <button id="btn-modal-char-confirm" class="primary-btn">Create Character</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <script src="/web/js/app.js"></script>
+</body>
+</html>

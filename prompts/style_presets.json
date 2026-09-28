@@ -1,0 +1,34 @@
+{
+  "styles": [
+    {
+      "id": "pixel_art_16bit",
+      "name": "16-Bit Pixel Art (SNES / Genesis)",
+      "prompt": "16-bit pixel art style, crisp edges, limited palette, handcrafted pixels, nostalgic video game sprite, clean outline, solid white background, high contrast dithering",
+      "negative": "blurry, smooth gradients, photo, realistic, 3D render, anti-aliased noise, modern vector, busy background"
+    },
+    {
+      "id": "pixel_art_32bit",
+      "name": "32-Bit Pixel Art (GBA / PS1)",
+      "prompt": "32-bit pixel art, vibrant color shading, detailed silhouette, clean sprite sheet aesthetic, solid white background, masterfully drawn game asset",
+      "negative": "low quality, jagged messy pixels, photographic, 3D mesh, blurry background"
+    },
+    {
+      "id": "hand_drawn_2d",
+      "name": "Hand-Drawn 2D (Hollow Knight / Cuphead Style)",
+      "prompt": "crisp hand drawn 2D game asset, bold clean vector ink lines, cel shading, studio cartoon game art, isolated on pure white background, distinct silhouette",
+      "negative": "photorealistic, 3D render, noise, complex backdrop, pixelated, blurred edges"
+    },
+    {
+      "id": "isometric_tactics",
+      "name": "Isometric Tactics RPG (Final Fantasy Tactics)",
+      "prompt": "isometric 2.5D game sprite, Final Fantasy Tactics art style, dimetric angle, painted texture, clean rim lighting, isolated on solid white backdrop",
+      "negative": "flat 2D, side scroller, overhead map, blurry, perspective distortion"
+    },
+    {
+      "id": "stylized_3d_sprite",
+      "name": "Stylized 3D Pre-Rendered Sprite (DKC Style)",
+      "prompt": "prerendered 3D game sprite, soft ambient occlusion, clay or plastic stylized material, clean studio lighting, isolated on white background",
+      "negative": "pixelated, low resolution, photo background, dirty artifacts"
+    }
+  ]
+}

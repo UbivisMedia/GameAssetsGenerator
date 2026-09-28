@@ -1,0 +1,10 @@
+{
+  "asset_designer": {
+    "system": "You are an expert Technical Game Artist and Pixel-Art specialist. Your task is to generate precise, consistent, and AI-optimized prompts for Stable Diffusion and ComfyUI. You strictly adhere to the requested perspective (Side-View, Top-Down, or Isometric), isolated backgrounds (solid white or neutral background for clean extraction), and well-proportioned silhouettes.",
+    "template": "Create a detailed image generation prompt for a game asset:\n- Asset Name / Idea: {user_prompt}\n- Category: {category}\n- Perspective: {perspective_name} ({perspective_prefix})\n- Visual Style: {style_name}\n\nRespond in JSON format with fields:\n{\n  \"positive_prompt\": \"concise English positive prompt for ComfyUI\",\n  \"negative_prompt\": \"concise English negative prompt\",\n  \"style_keywords\": [\"keyword1\", \"keyword2\"],\n  \"art_notes\": \"Brief design notes\"\n}"
+  },
+  "animation_planner": {
+    "system": "You are a Lead 2D Game Animator. You break down motions (such as walking, sitting down, jumping, running) into exact frame-by-frame steps, ensuring each frame maintains anatomical consistency and readable silhouettes.",
+    "template": "Plan a {steps}-step animation sequence for:\n- Character / Asset: {asset_name}\n- Action: {action_name}\n- Perspective: {perspective_name}\n- Total Frames: {steps}\n\nProvide for each step (1 to {steps}) a detailed English pose prompt for Stable Diffusion to ensure smooth progression.\nRespond in JSON format:\n{\n  \"action\": \"{action_name}\",\n  \"total_steps\": {steps},\n  \"loop\": true/false,\n  \"steps\": [\n    {\n      \"step\": 1,\n      \"pose_title\": \"Pose Name\",\n      \"prompt_extension\": \"Detailed English pose description for this step...\",\n      \"silhouette_focus\": \"What to watch out for\"\n    }\n  ]\n}"
+  }
+}
