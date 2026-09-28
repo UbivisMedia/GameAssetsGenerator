@@ -4,6 +4,26 @@ All notable changes and milestones of the GameAssetGenerator project are documen
 
 ---
 
+## [0.3.0] - 2026-09-28
+
+### Added
+- **Sequential Frame-by-Frame Generation Engine**:
+  - Replaced single-strip slicing with true sequential frame-by-frame generation.
+  - Implemented dynamic frame chaining via ComfyUI `/upload/image`, `LoadImage`, and `VAEEncode`.
+  - Frame $i$ references Frame $i-1$ via latent img2img (`denoise: 0.38`), ensuring 100% character identity, clothing, hair, and lighting consistency while cleanly articulating movement (mouth lip sync, eye blinks).
+  - Automatic `master_reference.png` initialization for Frame 1.
+- **Portrait & Bust Resolution Presets**:
+  - Added `256x384` (Portrait Bust), `512x768` (HD Dialogue Portrait), and `512x1024` (Visual Novel Full Bust) to `settings/resolutions.json`.
+  - Auto-selects `512x768` upon selecting the Portrait perspective in the Studio UI.
+
+### Fixed
+- **Elimination of Multi-Head Collage / Expression Sheet Artifacts**:
+  - Removed ambiguous plural prompt tokens (`frames`, `speech portrait frames`, `cycle sequence`) in `modules/character_animator.py` and `prompts/animation_breakdowns.json` that caused diffusion models to render collage sheets.
+  - Added comprehensive negative prompt guards against multiple characters, character sheets, expressions sheets, collages, duplicate heads, and border icons.
+  - Added automated prompt sanitation for portraits to remove contradictory full-body keywords.
+
+---
+
 ## [0.2.0] - 2026-09-28
 
 ### Added

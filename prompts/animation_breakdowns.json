@@ -26,7 +26,7 @@
       "side_view_cues": ["profile jaw movement", "speech posture"],
       "top_down_cues": ["head turning gesture"],
       "isometric_cues": ["isometric head angle with speech posture"],
-      "portrait_cues": ["jRPG dialogue lip sync frames", "expressive anime mouth shapes", "natural blinking eyes", "clean portrait frame"]
+      "portrait_cues": ["dialogue resting closed mouth", "dialogue open speaking mouth", "dialogue half-open mouth", "dialogue relaxed blinking eyes"]
     }
   }
 }

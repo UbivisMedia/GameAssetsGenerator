@@ -494,6 +494,12 @@ def generate_asset(req: GenerateAssetRequest):
         if base_p and base_p.lower() not in effective_prompt.lower():
             effective_prompt = f"{base_p}, {effective_prompt}"
 
+    if req.perspective == "portrait":
+        # Remove contradictory full-body tokens that confuse diffusion models into collage sheets
+        import re
+        for bad_token in ["full body view sprite", "full body view", "full body", "feet visible", "standing full length", "standing pose"]:
+            effective_prompt = re.sub(re.escape(bad_token), "", effective_prompt, flags=re.IGNORECASE)
+
     # 1. Run module prompt prepare hook
     context = {
         "project": req.project_name,
@@ -514,6 +520,19 @@ def generate_asset(req: GenerateAssetRequest):
         "palette_mode": req.palette_mode
     }
     context = mod_mgr.run_prompt_prepare(context)
+
+    # Ensure negative prompt always contains anti-sheet & anti-collage safeguards
+    anti_sheet_neg = (
+        "multiple characters, multiple views, character sheet, expressions sheet, "
+        "portrait sheet, collage, montage, side by side, extra heads, duplicate heads, "
+        "cloned face, border avatars, icons, split view, multi-panel"
+    )
+    if req.perspective == "portrait":
+        anti_sheet_neg += ", full body, feet, shoes, legs, standing full length"
+
+    current_neg = context.get("negative_prompt", "")
+    if "multiple characters" not in current_neg:
+        context["negative_prompt"] = f"{anti_sheet_neg}, {current_neg}".strip(", ")
 
     # 2. Check ComfyUI or fallback to mock demo if requested or offline
     comfy_status = comfy_client.check_connection()

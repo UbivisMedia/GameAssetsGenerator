@@ -19,23 +19,37 @@ class CharacterAnimatorModule(BaseAssetModule):
         """Injects movement and pose consistency keywords if category is character."""
         category = context.get("category", "")
         action = context.get("action", "")
-        steps = context.get("steps", 1)
+        perspective = context.get("perspective", "")
 
         if category == "characters" and action:
             pos = context.get("positive_prompt", "")
             action_tags = {
-                "walk": "clean walk cycle sequence, grounded feet, dynamic stepping pose",
-                "run": "high speed running stride, aerodynamic forward tilt, motion silhouette",
-                "sit": "sitting animation sequence, bending knees downward, relaxed seated posture",
-                "jump": "jumping arc, vertical lift, airborne knees flexed, gravity impact",
+                "walk": "grounded feet, dynamic stepping pose",
+                "run": "high speed running stride, aerodynamic forward tilt",
+                "sit": "bending knees downward, relaxed seated posture",
+                "jump": "jumping arc, airborne knees flexed",
                 "idle": "subtle breathing stance, resting ready pose, relaxed arms",
-                "attack": "weapon strike action frame, kinetic attack slash, anticipation pose",
-                "talk": "dialogue mouth speaking and closing, eye blinking, expressive speech portrait frames"
+                "attack": "weapon strike action, kinetic attack slash",
+                "talk": "expressive facial expression, dialogue pose"
             }
-            extra = action_tags.get(action.lower(), f"{action} animation phase")
-            context["positive_prompt"] = f"{pos}, {extra}, consistent character design, matching clothing and colors"
+            extra = action_tags.get(action.lower(), f"{action} pose")
+            
+            # Anti-multi-character & anti-spritesheet protection
+            anti_sheet_pos = "single character, solo"
+            if perspective == "portrait":
+                anti_sheet_pos += ", centered bust shot, head and shoulders portrait"
+            
+            context["positive_prompt"] = f"{anti_sheet_pos}, {pos}, {extra}, consistent character design, matching clothing and colors"
 
             neg = context.get("negative_prompt", "")
-            context["negative_prompt"] = f"{neg}, changing character faces, morphing anatomy, differing outfits"
+            sheet_neg = (
+                "multiple characters, multiple views, character sheet, expressions sheet, "
+                "portrait sheet, collage, montage, side by side, extra heads, duplicate heads, "
+                "cloned face, border avatars, icons, split view, multi-panel, comic layout"
+            )
+            if perspective == "portrait":
+                sheet_neg += ", full body, feet, shoes, legs, standing full length"
+                
+            context["negative_prompt"] = f"{sheet_neg}, {neg}".strip(", ")
 
         return context

@@ -39,8 +39,8 @@
       "badge": "jRPG / Visual Novel",
       "icon": "bi-person-badge",
       "description": "Close-up bust or half-body portrait for dialogue boxes, menu status screens, and jRPG cutscenes.",
-      "prompt_prefix": "jRPG character portrait bust, visual novel dialogue avatar, high quality face and shoulders, expressive eyes and hair, centered headshot, clean solid background",
-      "negative_prompt": "full body, tiny sprite, feet visible, platformer angle, overhead map, blurry face, cropped hair",
+      "prompt_prefix": "solo, single character, centered bust shot, head and shoulders portrait, jRPG dialogue avatar, high quality face and shoulders, expressive eyes and hair, centered composition, clean solid background",
+      "negative_prompt": "multiple characters, multiple views, character sheet, expressions sheet, portrait sheet, collage, montage, side by side, extra heads, duplicate heads, cloned face, border avatars, icons, split view, multi-panel, full body, feet, shoes, legs, tiny sprite, platformer angle, overhead map, blurry face, cropped hair",
       "aspect_ratio": "1:1",
       "ideal_for": ["characters", "ui"]
     }

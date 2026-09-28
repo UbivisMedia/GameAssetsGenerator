@@ -181,12 +181,19 @@ class LMClient:
             "'positive_prompt', 'negative_prompt', 'tags'."
         )
 
+        is_portrait = (perspective_data.get("id") == "portrait")
+        reqs = (
+            "Single isolated character portrait bust (head and shoulders), solo, centered headshot on pure plain white background, no full body, no multiple heads."
+            if is_portrait
+            else "Single isolated asset on pure plain white background, full body view, sharp silhouette."
+        )
+
         user_content = (
             f"Asset Concept: {user_prompt}\n"
             f"Category: {category}\n"
             f"Perspective: {persp_name} ({persp_prefix})\n"
             f"Style: {style_prompt}\n"
-            f"Requirements: Single isolated asset on pure plain white background, full body view, sharp silhouette."
+            f"Requirements: {reqs}"
         )
 
         try:
