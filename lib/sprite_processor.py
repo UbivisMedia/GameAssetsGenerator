@@ -48,33 +48,78 @@ class SpriteProcessor:
     def make_transparent(
         cls,
         image: Image.Image,
-        bg_color: Tuple[int, int, int] = (255, 255, 255),
+        bg_color: Optional[Tuple[int, int, int]] = (255, 255, 255),
         tolerance: int = 35
     ) -> Image.Image:
         """
-        Removes solid background color (e.g. pure white or studio backdrop)
-        with tolerance to produce a clean transparent PNG.
+        Removes background starting from image borders (flood fill from corners/edges)
+        so that white/light elements inside the character (e.g. eyes, teeth, white clothes)
+        are protected and NEVER accidentally erased.
+        Also safeguards against wiping out the entire image.
         """
         img = image.convert("RGBA")
-        data = img.getdata()
-        new_data = []
+        w, h = img.size
+        pixels = img.load()
 
-        tr, tg, tb = bg_color
+        if bg_color is None:
+            corners = [pixels[0, 0], pixels[w - 1, 0], pixels[0, h - 1], pixels[w - 1, h - 1]]
+            avg_r = int(sum(c[0] for c in corners) / 4)
+            avg_g = int(sum(c[1] for c in corners) / 4)
+            avg_b = int(sum(c[2] for c in corners) / 4)
+            tr, tg, tb = avg_r, avg_g, avg_b
+        else:
+            tr, tg, tb = bg_color
 
-        for item in data:
-            r, g, b, a = item
+        from collections import deque
+        visited = bytearray(w * h)
+        queue = deque()
+
+        # Seed from all 4 borders
+        for x in range(w):
+            for y in (0, h - 1):
+                idx = y * w + x
+                if not visited[idx]:
+                    r, g, b, a = pixels[x, y]
+                    if max(abs(r - tr), abs(g - tg), abs(b - tb)) <= tolerance + 15:
+                        visited[idx] = 1
+                        queue.append((x, y))
+
+        for y in range(h):
+            for x in (0, w - 1):
+                idx = y * w + x
+                if not visited[idx]:
+                    r, g, b, a = pixels[x, y]
+                    if max(abs(r - tr), abs(g - tg), abs(b - tb)) <= tolerance + 15:
+                        visited[idx] = 1
+                        queue.append((x, y))
+
+        transparent_count = 0
+        while queue:
+            cx, cy = queue.popleft()
+            r, g, b, a = pixels[cx, cy]
             diff = max(abs(r - tr), abs(g - tg), abs(b - tb))
-            if diff <= tolerance:
-                # Fully transparent
-                new_data.append((r, g, b, 0))
-            elif diff <= tolerance + 15:
-                # Feather edge
-                alpha_factor = (diff - tolerance) / 15.0
-                new_data.append((r, g, b, int(a * alpha_factor)))
-            else:
-                new_data.append(item)
 
-        img.putdata(new_data)
+            if diff <= tolerance:
+                pixels[cx, cy] = (r, g, b, 0)
+                transparent_count += 1
+            elif diff <= tolerance + 15:
+                alpha = int(a * ((diff - tolerance) / 15.0))
+                pixels[cx, cy] = (r, g, b, alpha)
+
+            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                nx, ny = cx + dx, cy + dy
+                if 0 <= nx < w and 0 <= ny < h:
+                    nidx = ny * w + nx
+                    if not visited[nidx]:
+                        visited[nidx] = 1
+                        nr, ng, nb, _ = pixels[nx, ny]
+                        if max(abs(nr - tr), abs(ng - tg), abs(nb - tb)) <= tolerance + 15:
+                            queue.append((nx, ny))
+
+        # Safeguard: if flood fill erased > 95% of pixels, keep original to avoid blank frames
+        if transparent_count >= w * h * 0.95:
+            return image.convert("RGBA")
+
         return img
 
     @classmethod

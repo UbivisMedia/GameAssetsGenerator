@@ -506,10 +506,37 @@ def generate_asset(req: GenerateAssetRequest):
         # Let modules modify workflow
         workflow = mod_mgr.run_workflow_prepare(workflow_template, context)
 
-        # Inject generation parameters
-        latent_w = 1024 if req.steps_count > 1 else 512
-        latent_h = 512 // (req.steps_count if req.steps_count > 4 else 1)
-        latent_h = max(256, min(512, latent_h))
+        # Determine optimal latent dimensions based on perspective and model architecture
+        is_anima = bool(req.unet and "anima" in req.unet.lower())
+
+        if req.perspective == "portrait":
+            if req.steps_count == 1:
+                latent_w = 512
+                latent_h = 768
+            else:
+                latent_w = 1024
+                latent_h = 512
+        else:
+            if req.steps_count > 1:
+                latent_w = 1024
+                latent_h = 512 if is_anima else (512 if req.steps_count <= 4 else 256)
+            else:
+                latent_w = 512
+                latent_h = 512
+
+        effective_cfg = req.cfg
+        effective_sampler = req.sampler_name
+        effective_scheduler = req.scheduler
+
+        # Anima / DiT tuning safeguards (prevent latent burnout to white)
+        if is_anima:
+            if req.cfg > 4.5:
+                effective_cfg = 4.0
+                logger.info(f"Auto-tuning Anima CFG from {req.cfg} to 4.0 to prevent latent saturation.")
+            if not effective_sampler or effective_sampler == "euler_ancestral":
+                effective_sampler = "euler"
+            if not effective_scheduler or effective_scheduler == "karras":
+                effective_scheduler = "simple"
 
         configured_wf = comfy_client.inject_parameters(
             workflow=workflow,
@@ -519,14 +546,14 @@ def generate_asset(req: GenerateAssetRequest):
             height=latent_h,
             seed=seed,
             steps=req.steps,
-            cfg=req.cfg,
+            cfg=effective_cfg,
             checkpoint=req.checkpoint,
             unet=req.unet,
             lora=req.lora,
             lora_strength=req.lora_strength,
             vae=req.vae,
-            sampler_name=req.sampler_name,
-            scheduler=req.scheduler
+            sampler_name=effective_sampler,
+            scheduler=effective_scheduler
         )
 
         try:
