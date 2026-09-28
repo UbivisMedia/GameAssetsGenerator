@@ -48,6 +48,7 @@ GameAssetGenerator/
 ├── main.py          # FastAPI application server
 ├── start.bat        # Windows batch launcher
 ├── start.ps1        # PowerShell launcher
+├── start.sh         # Linux / macOS shell launcher
 └── .gitignore       # Git ignore rules
 ```
 
@@ -55,11 +56,8 @@ GameAssetGenerator/
 
 ## 3. Starting the Studio
 
-Run [`start.bat`](file:///e:/GameAssetGenerator/start.bat) or in PowerShell:
-
-```powershell
-.\start.ps1
-```
+- **Windows**: Double-click [`start.bat`](file:///e:/GameAssetGenerator/start.bat) or run `.\start.ps1` in PowerShell.
+- **Linux / macOS**: Run `./start.sh` in your terminal (`chmod +x start.sh`).
 
 Open your browser at:
 👉 **`http://127.0.0.1:7865`**

@@ -56,6 +56,7 @@ A modular AI studio designed for generating 2D and 2.5D game assets with consist
 | [`main.py`](file:///e:/GameAssetGenerator/main.py) | Application server & orchestration engine (FastAPI / Uvicorn) |
 | [`start.bat`](file:///e:/GameAssetGenerator/start.bat) | Windows 1-click batch launcher |
 | [`start.ps1`](file:///e:/GameAssetGenerator/start.ps1) | PowerShell native start script |
+| [`start.sh`](file:///e:/GameAssetGenerator/start.sh) | Linux / macOS bash start script |
 | [`.gitignore`](file:///e:/GameAssetGenerator/.gitignore) | Git ignore rules for virtual environments, outputs, and caches |
 
 ---
@@ -63,11 +64,9 @@ A modular AI studio designed for generating 2D and 2.5D game assets with consist
 ## 🚀 Quickstart
 
 1. **Launch the server**:
-   Double click [`start.bat`](file:///e:/GameAssetGenerator/start.bat) or run in PowerShell:
-   ```powershell
-   .\start.ps1
-   ```
-   *(or `py -3.10 main.py`)*
+   - **Windows**: Double-click [`start.bat`](file:///e:/GameAssetGenerator/start.bat) or run `.\start.ps1` in PowerShell
+   - **Linux / macOS**: Run `./start.sh` in terminal (`chmod +x start.sh`)
+   - *(or `python3 main.py` / `py -3.10 main.py`)*
 
 2. **Open your browser**:
    Navigate to **[http://127.0.0.1:7865](http://127.0.0.1:7865)**.

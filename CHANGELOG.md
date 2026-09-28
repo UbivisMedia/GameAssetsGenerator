@@ -23,6 +23,9 @@ All notable changes and milestones of the GameAssetGenerator project are documen
   - Added responsive 4-column perspective selector in `web/index.html` and `web/css/style.css` with custom SVG bust icon.
 - **Console Log Quieting**:
   - Minimized Uvicorn access log spam and fixed empty 204 response handling.
+- **Linux & macOS Start Script (`start.sh`)**:
+  - Added bash launcher with automatic Python interpreter detection and virtual environment support (`.venv`/`venv`).
+  - Added `.gitattributes` to ensure LF line endings for shell scripts.
 
 ---
 
