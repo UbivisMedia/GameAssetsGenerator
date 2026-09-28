@@ -67,6 +67,38 @@ class ComfyClient:
         with urllib.request.urlopen(req, timeout=30) as response:
             return response.read()
 
+    def upload_image(self, image_bytes: bytes, filename: str = "gag_ref.png") -> str:
+        """
+        Uploads an image to ComfyUI (/upload/image) for use in LoadImage nodes.
+        Returns the filename assigned by ComfyUI.
+        """
+        boundary = f"----WebKitFormBoundary{uuid.uuid4().hex}"
+        body = []
+        body.append(f"--{boundary}\r\n".encode())
+        body.append(f'Content-Disposition: form-data; name="image"; filename="{filename}"\r\n'.encode())
+        body.append(b"Content-Type: image/png\r\n\r\n")
+        body.append(image_bytes)
+        body.append(b"\r\n")
+        body.append(f"--{boundary}\r\n".encode())
+        body.append(b'Content-Disposition: form-data; name="overwrite"\r\n\r\n')
+        body.append(b"true\r\n")
+        body.append(f"--{boundary}--\r\n".encode())
+        payload = b"".join(body)
+
+        req = urllib.request.Request(
+            f"{self.base_url}/upload/image",
+            data=payload,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            method="POST"
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return data.get("name", filename)
+        except Exception as e:
+            logger.error(f"Failed to upload reference image to ComfyUI: {e}")
+            raise
+
     def queue_prompt(self, workflow_prompt: Dict[str, Any]) -> Optional[str]:
         """Submits a prompt graph to ComfyUI /prompt and returns the prompt_id."""
         payload = {
@@ -173,7 +205,9 @@ class ComfyClient:
         lora_strength: float = 1.0,
         vae: Optional[str] = None,
         sampler_name: Optional[str] = None,
-        scheduler: Optional[str] = None
+        scheduler: Optional[str] = None,
+        reference_image: Optional[str] = None,
+        denoise: float = 1.0
     ) -> Dict[str, Any]:
         """
         Dynamically finds and configures nodes in standard ComfyUI API workflows:
@@ -182,7 +216,8 @@ class ComfyClient:
         - VAELoader (Optional external VAE)
         - CLIPTextEncode (Positive / Negative)
         - EmptyLatentImage (Width, Height, Batch Size)
-        - KSampler (Seed, Steps, CFG, Sampler, Scheduler)
+        - LoadImage + VAEEncode (Reference Image chaining for frame-by-frame animation)
+        - KSampler (Seed, Steps, CFG, Sampler, Scheduler, Denoise)
         """
         import copy
         wf = copy.deepcopy(workflow)
@@ -422,6 +457,47 @@ class ComfyClient:
                     elif "positive" in title or not pos_id:
                         inputs["text"] = positive_prompt
                         pos_id = node_id
+
+        # 5. Handle Reference Image (img2img / frame-to-frame animation chaining)
+        if reference_image:
+            # Find active VAE connection
+            vae_link = None
+            for nid, n in wf.items():
+                if n.get("class_type") == "VAEDecode":
+                    vae_link = n.get("inputs", {}).get("vae")
+                    if vae_link:
+                        break
+            if not vae_link:
+                vae_link = [vae_source_node, vae_source_slot]
+
+            load_img_id = str(max(numeric_ids, default=950) + 1)
+            numeric_ids.append(int(load_img_id))
+            wf[load_img_id] = {
+                "class_type": "LoadImage",
+                "inputs": {
+                    "image": reference_image
+                },
+                "_meta": {"title": f"Load Frame Reference ({reference_image})"}
+            }
+
+            vae_enc_id = str(max(numeric_ids, default=950) + 1)
+            numeric_ids.append(int(vae_enc_id))
+            wf[vae_enc_id] = {
+                "class_type": "VAEEncode",
+                "inputs": {
+                    "pixels": [load_img_id, 0],
+                    "vae": vae_link
+                },
+                "_meta": {"title": "Encode Reference Image to Latent"}
+            }
+
+            for k_id in ksampler_nodes:
+                wf[k_id].setdefault("inputs", {})["latent_image"] = [vae_enc_id, 0]
+                wf[k_id]["inputs"]["denoise"] = denoise
+            logger.info(f"Injected Reference Image ({reference_image}) with denoise={denoise}")
+        elif denoise < 1.0:
+            for k_id in ksampler_nodes:
+                wf[k_id].setdefault("inputs", {})["denoise"] = denoise
 
         return wf
 

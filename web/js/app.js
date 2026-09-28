@@ -490,6 +490,17 @@ document.addEventListener('DOMContentLoaded', () => {
       state.selectedPerspective = card.dataset.perspective;
       updatePerspectiveUI();
       updateStepBreakdownUI();
+
+      if (state.selectedPerspective === 'portrait') {
+        if (resolutionSelect && (resolutionSelect.value === '64x64' || resolutionSelect.value === '32x32' || resolutionSelect.value === '16x16')) {
+          const portraitOpt = Array.from(resolutionSelect.options).find(opt => opt.value === '512x768');
+          if (portraitOpt) {
+            resolutionSelect.value = '512x768';
+            widthInput.value = 512;
+            heightInput.value = 768;
+          }
+        }
+      }
     });
   });
 

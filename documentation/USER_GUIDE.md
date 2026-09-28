@@ -56,7 +56,7 @@ GameAssetGenerator/
 
 ## 3. Starting the Studio
 
-- **Windows**: Double-click [`start.bat`](file:///e:/GameAssetGenerator/start.bat) or run `.\start.ps1` in PowerShell.
+- **Windows**: Double-click [`start.bat`](file:///./start.bat) or run `.\start.ps1` in PowerShell.
 - **Linux / macOS**: Run `./start.sh` in your terminal (`chmod +x start.sh`).
 
 Open your browser at:

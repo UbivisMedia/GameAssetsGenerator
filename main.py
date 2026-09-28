@@ -420,6 +420,46 @@ def create_mock_sprite_frame(
     return img
 
 
+def get_step_cue(action: str, step_idx: int, total_steps: int, perspective: str) -> str:
+    """
+    Returns specific visual pose/action cues for animation step idx (0-indexed).
+    Combines settings/animations.json and prompts/animation_breakdowns.json.
+    """
+    action_data = config_mgr.get_animation_action(action)
+    step_desc = ""
+    if action_data:
+        step_descriptions = action_data.get("step_descriptions", {})
+        if str(total_steps) in step_descriptions:
+            descs = step_descriptions[str(total_steps)]
+            if step_idx < len(descs):
+                step_desc = descs[step_idx]
+        elif step_descriptions:
+            first_key = list(step_descriptions.keys())[0]
+            descs = step_descriptions[first_key]
+            if descs:
+                step_desc = descs[step_idx % len(descs)]
+
+    bd_file = BASE_DIR / "prompts" / "animation_breakdowns.json"
+    bd_cues = []
+    if bd_file.exists():
+        try:
+            with open(bd_file, "r", encoding="utf-8") as f:
+                bd_data = json.load(f).get("breakdowns", {}).get(action, {})
+                cues = bd_data.get(f"{perspective}_cues", [])
+                if cues:
+                    bd_cues.append(cues[step_idx % len(cues)])
+        except Exception:
+            pass
+
+    parts = []
+    if step_desc:
+        parts.append(step_desc)
+    if bd_cues:
+        parts.extend(bd_cues)
+
+    return ", ".join(parts)
+
+
 @app.post("/api/generate")
 def generate_asset(req: GenerateAssetRequest):
     """
@@ -506,23 +546,15 @@ def generate_asset(req: GenerateAssetRequest):
         # Let modules modify workflow
         workflow = mod_mgr.run_workflow_prepare(workflow_template, context)
 
-        # Determine optimal latent dimensions based on perspective and model architecture
+        # Determine optimal latent dimensions per frame
         is_anima = bool(req.unet and "anima" in req.unet.lower())
 
         if req.perspective == "portrait":
-            if req.steps_count == 1:
-                latent_w = 512
-                latent_h = 768
-            else:
-                latent_w = 1024
-                latent_h = 512
+            latent_w = 512
+            latent_h = 768
         else:
-            if req.steps_count > 1:
-                latent_w = 1024
-                latent_h = 512 if is_anima else (512 if req.steps_count <= 4 else 256)
-            else:
-                latent_w = 512
-                latent_h = 512
+            latent_w = 512
+            latent_h = 512
 
         effective_cfg = req.cfg
         effective_sampler = req.sampler_name
@@ -538,55 +570,92 @@ def generate_asset(req: GenerateAssetRequest):
             if not effective_scheduler or effective_scheduler == "karras":
                 effective_scheduler = "simple"
 
-        configured_wf = comfy_client.inject_parameters(
-            workflow=workflow,
-            positive_prompt=context["positive_prompt"],
-            negative_prompt=context["negative_prompt"],
-            width=latent_w,
-            height=latent_h,
-            seed=seed,
-            steps=req.steps,
-            cfg=effective_cfg,
-            checkpoint=req.checkpoint,
-            unet=req.unet,
-            lora=req.lora,
-            lora_strength=req.lora_strength,
-            vae=req.vae,
-            sampler_name=effective_sampler,
-            scheduler=effective_scheduler
-        )
+        # Check if master reference image exists for this character
+        master_ref_bytes: Optional[bytes] = None
+        if char_id and req.rubrik == "characters" and req.use_character_reference:
+            c_dir = proj_mgr.get_character_dir(req.project_name, char_id)
+            m_path = c_dir / "master_reference.png"
+            if m_path.exists() and m_path.stat().st_size > 30000:
+                try:
+                    with open(m_path, "rb") as mf:
+                        master_ref_bytes = mf.read()
+                    logger.info(f"Loaded master reference for {char_id} ({len(master_ref_bytes)} bytes)")
+                except Exception as e:
+                    logger.warning(f"Could not read master reference: {e}")
+
+        # Sequential frame-by-frame generation loop
+        raw_frames: List[Image.Image] = []
+        last_frame_bytes: Optional[bytes] = None
 
         try:
-            prompt_id = comfy_client.queue_prompt(configured_wf)
-            image_outputs = comfy_client.wait_for_completion(prompt_id)
-            if not image_outputs:
-                raise RuntimeError("ComfyUI did not return any output images.")
+            for step_i in range(req.steps_count):
+                step_cue = get_step_cue(req.action, step_i, req.steps_count, req.perspective)
+                logger.info(f"Generating Frame {step_i + 1}/{req.steps_count} for {req.asset_name} (Cue: '{step_cue}')")
 
-            # Download first output image
-            fn, subf, ftype = image_outputs[0]
-            raw_bytes = comfy_client.get_image_data(fn, subf, ftype)
-            master_img = SpriteProcessor.load_image(raw_bytes)
+                ref_comfy_name = None
+                frame_denoise = 1.0
 
-            # Slicing if multi-step strip
-            if req.steps_count > 1:
-                frames = SpriteProcessor.slice_strip(
-                    master_img,
-                    num_frames=req.steps_count,
-                    target_width=req.width,
-                    target_height=req.height,
-                    scaling_mode=req.scaling_mode
+                if step_i == 0:
+                    if master_ref_bytes:
+                        ref_comfy_name = comfy_client.upload_image(master_ref_bytes, filename=f"master_ref_{char_id}.png")
+                        frame_denoise = 0.50
+                        frame_prompt = f"{context['positive_prompt']}, {step_cue}" if step_cue else context['positive_prompt']
+                    else:
+                        ref_comfy_name = None
+                        frame_denoise = 1.0
+                        frame_prompt = f"{context['positive_prompt']}, {step_cue}" if step_cue else context['positive_prompt']
+                else:
+                    if last_frame_bytes:
+                        ref_comfy_name = comfy_client.upload_image(last_frame_bytes, filename=f"frame_ref_{step_i - 1}.png")
+                        frame_denoise = 0.38
+                        frame_prompt = f"{context['positive_prompt']}, {step_cue}, consistent character, identical clothes and style"
+                    else:
+                        frame_denoise = 1.0
+                        frame_prompt = f"{context['positive_prompt']}, {step_cue}"
+
+                configured_wf = comfy_client.inject_parameters(
+                    workflow=workflow,
+                    positive_prompt=frame_prompt,
+                    negative_prompt=context["negative_prompt"],
+                    width=latent_w,
+                    height=latent_h,
+                    seed=seed + (step_i * 7 if step_i > 0 else 0),
+                    steps=req.steps,
+                    cfg=effective_cfg,
+                    checkpoint=req.checkpoint,
+                    unet=req.unet,
+                    lora=req.lora,
+                    lora_strength=req.lora_strength,
+                    vae=req.vae,
+                    sampler_name=effective_sampler,
+                    scheduler=effective_scheduler,
+                    reference_image=ref_comfy_name,
+                    denoise=frame_denoise
                 )
-            else:
-                resized = SpriteProcessor.resize_sprite(
-                    master_img,
-                    req.width,
-                    req.height,
-                    mode=req.scaling_mode
-                )
-                frames = [resized]
+
+                prompt_id = comfy_client.queue_prompt(configured_wf)
+                image_outputs = comfy_client.wait_for_completion(prompt_id)
+                if not image_outputs:
+                    raise RuntimeError(f"ComfyUI did not return output for frame {step_i + 1}.")
+
+                fn, subf, ftype = image_outputs[0]
+                raw_img_bytes = comfy_client.get_image_data(fn, subf, ftype)
+                frame_img = SpriteProcessor.load_image(raw_img_bytes)
+                raw_frames.append(frame_img)
+
+                from io import BytesIO
+                buf = BytesIO()
+                frame_img.save(buf, format="PNG")
+                last_frame_bytes = buf.getvalue()
+
+            frames = [
+                SpriteProcessor.resize_sprite(rf, req.width, req.height, mode=req.scaling_mode)
+                for rf in raw_frames
+            ]
 
         except Exception as e:
             logger.error(f"ComfyUI execution failed: {e}. Falling back to demo preview.")
+            frames = []
             for step_idx in range(req.steps_count):
                 frames.append(create_mock_sprite_frame(
                     width=req.width,

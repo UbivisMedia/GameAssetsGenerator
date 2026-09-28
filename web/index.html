@@ -1,15 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GameAssetGenerator - 2D & Isometric Sprite Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300f0ff'><polygon points='12 2 2 7 12 12 22 7 12 2'/><polyline points='2 17 12 22 22 17'/><polyline points='2 12 12 17 22 12'/></svg>">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
+    rel="stylesheet">
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300f0ff'><polygon points='12 2 2 7 12 12 22 7 12 2'/><polyline points='2 17 12 22 22 17'/><polyline points='2 12 12 17 22 12'/></svg>">
   <link rel="stylesheet" href="/web/css/style.css">
 </head>
+
 <body>
   <div class="app-layout">
     <!-- Top Navigation Header -->
@@ -185,7 +190,8 @@
             </div>
             <div class="form-group">
               <label for="height-input">Height (px)</label>
-              <input type="number" id="height-input" class="form-input font-mono" value="64" min="8" max="1024" step="8">
+              <input type="number" id="height-input" class="form-input font-mono" value="64" min="8" max="1024"
+                step="8">
             </div>
             <div class="form-group">
               <label for="scaling-mode">Filter</label>
@@ -227,7 +233,9 @@
               <span class="sub-label">Planned Frame Sequence:</span>
               <button id="btn-lm-plan" class="text-button-ai">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+                  <path
+                    d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83">
+                  </path>
                 </svg>
                 AI Keyframe Plan (LM Studio)
               </button>
@@ -243,7 +251,8 @@
               <span class="card-icon">🧠</span>
               <h2>AI Models & Engine (ComfyUI)</h2>
             </div>
-            <button id="btn-refresh-models" class="mini-btn" title="Refresh ComfyUI and LM Studio Models">↻ Refresh</button>
+            <button id="btn-refresh-models" class="mini-btn" title="Refresh ComfyUI and LM Studio Models">↻
+              Refresh</button>
           </div>
 
           <!-- Checkpoint -->
@@ -253,19 +262,23 @@
               <span id="checkpoint-badge" class="badge">Loading models...</span>
             </div>
             <select id="checkpoint-select" class="form-input font-mono"></select>
-            <span id="checkpoint-role-hint" class="help-text">Standard all-in-one base model (Generative UNet + Text Encoder CLIP + VAE).</span>
+            <span id="checkpoint-role-hint" class="help-text">Standard all-in-one base model (Generative UNet + Text
+              Encoder CLIP + VAE).</span>
           </div>
 
           <!-- Standalone UNet (e.g. Anima) -->
           <div class="form-group mt-2">
             <div class="flex-between">
               <label for="unet-select" id="unet-label">Custom UNet Diffusion Model (e.g. Anima)</label>
-              <span id="unet-active-badge" class="badge" style="display: none; color: var(--accent-cyan); border-color: var(--accent-cyan);">Active Generative Engine</span>
+              <span id="unet-active-badge" class="badge"
+                style="display: none; color: var(--accent-cyan); border-color: var(--accent-cyan);">Active Generative
+                Engine</span>
             </div>
             <select id="unet-select" class="form-input font-mono">
               <option value="">-- None (Use Checkpoint's Internal UNet) --</option>
             </select>
-            <span id="unet-hint" class="help-text">Overrides the checkpoint's UNet with this model. The Checkpoint above automatically supplies CLIP & VAE.</span>
+            <span id="unet-hint" class="help-text">Overrides the checkpoint's UNet with this model. The Checkpoint above
+              automatically supplies CLIP & VAE.</span>
           </div>
 
           <!-- LoRA -->
@@ -278,7 +291,8 @@
               <select id="lora-select" class="form-input font-mono">
                 <option value="">-- None / No LoRA --</option>
               </select>
-              <input type="range" id="lora-strength-slider" min="0.1" max="1.5" step="0.05" value="1.0" class="mini-range" title="LoRA Strength">
+              <input type="range" id="lora-strength-slider" min="0.1" max="1.5" step="0.05" value="1.0"
+                class="mini-range" title="LoRA Strength">
             </div>
           </div>
 
@@ -320,20 +334,24 @@
                 <select id="lm-model-select" class="form-input mini" title="Select LM Studio model"></select>
                 <button id="btn-enhance-prompt" class="text-button-ai">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    <polygon
+                      points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
+                    </polygon>
                   </svg>
                   Enhance with AI
                 </button>
               </div>
             </div>
-            <textarea id="prompt-input" class="form-textarea" rows="3" placeholder="e.g. Heroic knight in heavy steel plate armor with a broadsword"></textarea>
+            <textarea id="prompt-input" class="form-textarea" rows="3"
+              placeholder="e.g. Heroic knight in heavy steel plate armor with a broadsword"></textarea>
           </div>
 
           <details class="advanced-details mt-2">
             <summary>Advanced ComfyUI Parameters</summary>
             <div class="form-group mt-2">
               <label for="negative-prompt">Negative Prompt</label>
-              <textarea id="negative-prompt" class="form-textarea" rows="2" placeholder="blurry, distorted, photorealistic, 3d render"></textarea>
+              <textarea id="negative-prompt" class="form-textarea" rows="2"
+                placeholder="blurry, distorted, photorealistic, 3d render"></textarea>
             </div>
             <div class="form-grid three-cols mt-2">
               <div class="form-group">
@@ -346,7 +364,8 @@
               </div>
               <div class="form-group">
                 <label for="cfg-input">CFG Scale</label>
-                <input type="number" id="cfg-input" class="form-input font-mono" value="7.5" step="0.5" min="1" max="20">
+                <input type="number" id="cfg-input" class="form-input font-mono" value="7.5" step="0.5" min="1"
+                  max="20">
               </div>
             </div>
             <div class="form-check mt-2">
@@ -386,25 +405,27 @@
             <div class="stage-toolbar">
               <div class="zoom-controls">
                 <span>Zoom:</span>
-                <button class="zoom-btn" data-zoom="1">1x</button>
+                <button class="zoom-btn active" data-zoom="1">1x</button>
                 <button class="zoom-btn" data-zoom="2">2x</button>
-                <button class="zoom-btn active" data-zoom="4">4x</button>
+                <button class="zoom-btn" data-zoom="4">4x</button>
                 <button class="zoom-btn" data-zoom="8">8x</button>
               </div>
               <div class="stage-options">
-                <button id="btn-toggle-grid" class="tool-btn active" title="Toggle Transparency Checkerboard">🏁</button>
+                <button id="btn-toggle-grid" class="tool-btn active"
+                  title="Toggle Transparency Checkerboard">🏁</button>
                 <button id="btn-toggle-bounds" class="tool-btn" title="Toggle Sprite Bounds Box">📐</button>
               </div>
             </div>
 
             <!-- Canvas / Sprite Viewport -->
             <div class="sprite-viewport checkerboard" id="sprite-viewport">
-              <div id="sprite-container" class="sprite-container zoom-4x">
+              <div id="sprite-container" class="sprite-container zoom-1x">
                 <img id="active-frame-img" src="" alt="Active Frame" style="display: none;">
                 <div id="empty-state" class="empty-state">
                   <div class="empty-icon">🎮</div>
                   <h3>No Asset Generated Yet</h3>
-                  <p>Choose perspective, resolution, and animation steps on the left, then click <strong>Generate Asset</strong> or <strong>Mock Preview</strong>.</p>
+                  <p>Choose perspective, resolution, and animation steps on the left, then click <strong>Generate
+                      Asset</strong> or <strong>Mock Preview</strong>.</p>
                 </div>
               </div>
             </div>
@@ -499,14 +520,16 @@
     <div id="modal-new-character" class="modal-backdrop" style="display: none;">
       <div class="modal-dialog">
         <h3>Create New Character Group</h3>
-        <p class="help-text">This will create a base character entity to group and anchor all animation phases (walk, sit, jump, etc.).</p>
+        <p class="help-text">This will create a base character entity to group and anchor all animation phases (walk,
+          sit, jump, etc.).</p>
         <div class="form-group mt-2">
           <label for="new-character-name">Character Name</label>
           <input type="text" id="new-character-name" class="form-input" placeholder="e.g. Knight Arthur">
         </div>
         <div class="form-group mt-2">
           <label for="new-character-prompt">Base Appearance Prompt</label>
-          <textarea id="new-character-prompt" class="form-textarea" rows="2" placeholder="e.g. heroic knight in steel plate armor with blue flowing cape"></textarea>
+          <textarea id="new-character-prompt" class="form-textarea" rows="2"
+            placeholder="e.g. heroic knight in steel plate armor with blue flowing cape"></textarea>
         </div>
         <div class="modal-actions mt-3">
           <button id="btn-modal-char-cancel" class="secondary-btn">Cancel</button>
@@ -521,4 +544,5 @@
 
   <script src="/web/js/app.js"></script>
 </body>
+
 </html>

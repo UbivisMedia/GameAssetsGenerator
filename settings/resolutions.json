@@ -8,7 +8,10 @@
     { "id": "96x96", "name": "96 x 96 px", "width": 96, "height": 96, "category": "jRPG Portrait", "recommended_scale": 1 },
     { "id": "128x128", "name": "128 x 128 px", "width": 128, "height": 128, "category": "Hi-Res Sprite", "recommended_scale": 1 },
     { "id": "256x256", "name": "256 x 256 px", "width": 256, "height": 256, "category": "HD Detailed / Boss", "recommended_scale": 1 },
-    { "id": "512x512", "name": "512 x 512 px", "width": 512, "height": 512, "category": "Ultra HD / Illustration", "recommended_scale": 1 }
+    { "id": "512x512", "name": "512 x 512 px", "width": 512, "height": 512, "category": "Ultra HD / Illustration", "recommended_scale": 1 },
+    { "id": "256x384", "name": "256 x 384 px (Portrait Bust)", "width": 256, "height": 384, "category": "Portrait / Bust", "recommended_scale": 1 },
+    { "id": "512x768", "name": "512 x 768 px (HD Dialogue Portrait)", "width": 512, "height": 768, "category": "Portrait / Bust", "recommended_scale": 1 },
+    { "id": "512x1024", "name": "512 x 1024 px (Visual Novel Full Bust)", "width": 512, "height": 1024, "category": "Visual Novel / HD", "recommended_scale": 1 }
   ],
   "scaling_modes": [
     { "id": "nearest", "name": "Nearest Neighbor (Crisp Pixel-Art)", "description": "Preserves hard pixel edges without blurring." },

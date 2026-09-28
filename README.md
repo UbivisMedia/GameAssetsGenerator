@@ -48,27 +48,27 @@ A modular AI studio designed for generating 2D and 2.5D game assets with consist
 ## 📂 Project Structure
 
 | Directory / File | Description |
-|---|---|
-| [`documentation/`](file:///e:/GameAssetGenerator/documentation) | Guides for users, module developers, and ComfyUI setup |
-| [`lib/`](file:///e:/GameAssetGenerator/lib) | Core Python libraries (ComfyUI client, LM client, Sprite Engine, etc.) |
-| [`modules/`](file:///e:/GameAssetGenerator/modules) | Plugin directory for custom modules (`BaseAssetModule`) |
-| [`output/`](file:///e:/GameAssetGenerator/output) | Categorized project deliverables (`<Project>/<Category>/<Asset>/`) |
-| [`prompts/`](file:///e:/GameAssetGenerator/prompts) | LM Studio prompt templates, art styles, and keyframe breakdowns |
-| [`settings/`](file:///e:/GameAssetGenerator/settings) | JSON configurations (categories, resolutions, perspectives, server) |
-| [`web/`](file:///e:/GameAssetGenerator/web) | Web interface (HTML5, Modern CSS, Vanilla JS) |
-| [`workflows/`](file:///e:/GameAssetGenerator/workflows) | ComfyUI API workflows for sprite generation |
-| [`main.py`](file:///e:/GameAssetGenerator/main.py) | Application server & orchestration engine (FastAPI / Uvicorn) |
-| [`start.bat`](file:///e:/GameAssetGenerator/start.bat) | Windows 1-click batch launcher |
-| [`start.ps1`](file:///e:/GameAssetGenerator/start.ps1) | PowerShell native start script |
-| [`start.sh`](file:///e:/GameAssetGenerator/start.sh) | Linux / macOS bash start script |
-| [`.gitignore`](file:///e:/GameAssetGenerator/.gitignore) | Git ignore rules for virtual environments, outputs, and caches |
+| --- | --- |
+| [`documentation/`](file:///./documentation) | Guides for users, module developers, and ComfyUI setup |
+| [`lib/`](file:///./lib) | Core Python libraries (ComfyUI client, LM client, Sprite Engine, etc.) |
+| [`modules/`](file:///./modules) | Plugin directory for custom modules (`BaseAssetModule`) |
+| [`output/`](file:///./output) | Categorized project deliverables (`<Project>/<Category>/<Asset>/`) |
+| [`prompts/`](file:///./prompts) | LM Studio prompt templates, art styles, and keyframe breakdowns |
+| [`settings/`](file:///./settings) | JSON configurations (categories, resolutions, perspectives, server) |
+| [`web/`](file:///./web) | Web interface (HTML5, Modern CSS, Vanilla JS) |
+| [`workflows/`](file:///./workflows) | ComfyUI API workflows for sprite generation |
+| [`main.py`](file:///./main.py) | Application server & orchestration engine (FastAPI / Uvicorn) |
+| [`start.bat`](file:///./start.bat) | Windows 1-click batch launcher |
+| [`start.ps1`](file:///./start.ps1) | PowerShell native start script |
+| [`start.sh`](file:///./start.sh) | Linux / macOS bash start script |
+| [`.gitignore`](file:///./.gitignore) | Git ignore rules for virtual environments, outputs, and caches |
 
 ---
 
 ## 🚀 Quickstart
 
 1. **Launch the server**:
-   - **Windows**: Double-click [`start.bat`](file:///e:/GameAssetGenerator/start.bat) or run `.\start.ps1` in PowerShell
+   - **Windows**: Double-click [`start.bat`](file:///./start.bat) or run `.\start.ps1` in PowerShell
    - **Linux / macOS**: Run `./start.sh` in terminal (`chmod +x start.sh`)
    - *(or `python3 main.py` / `py -3.10 main.py`)*
 
@@ -85,7 +85,7 @@ A modular AI studio designed for generating 2D and 2.5D game assets with consist
 
 ## 📖 Documentation
 
-- [User Guide (USER_GUIDE.md)](file:///e:/GameAssetGenerator/documentation/USER_GUIDE.md)
-- [Module Development Guide (MODULE_DEVELOPMENT.md)](file:///e:/GameAssetGenerator/documentation/MODULE_DEVELOPMENT.md)
-- [ComfyUI Integration (COMFYUI_SETUP.md)](file:///e:/GameAssetGenerator/documentation/COMFYUI_SETUP.md)
-- [LM Studio Integration (LM_STUDIO_INTEGRATION.md)](file:///e:/GameAssetGenerator/documentation/LM_STUDIO_INTEGRATION.md)
+- [User Guide (USER_GUIDE.md)](file:///./documentation/USER_GUIDE.md)
+- [Module Development Guide (MODULE_DEVELOPMENT.md)](file:///./documentation/MODULE_DEVELOPMENT.md)
+- [ComfyUI Integration (COMFYUI_SETUP.md)](file:///./documentation/COMFYUI_SETUP.md)
+- [LM Studio Integration (LM_STUDIO_INTEGRATION.md)](file:///./documentation/LM_STUDIO_INTEGRATION.md)
