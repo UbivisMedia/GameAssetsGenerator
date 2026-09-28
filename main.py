@@ -122,6 +122,22 @@ class GenerateAssetRequest(BaseModel):
     vae: Optional[str] = None
     sampler_name: Optional[str] = None
     scheduler: Optional[str] = None
+    direction: Optional[str] = "S"
+    mirror_symmetry: bool = True
+    chroma_color: Optional[str] = None
+    chroma_tolerance: int = 35
+
+
+class ChromaKeyRequest(BaseModel):
+    image_url: str
+    color: Optional[str] = None
+    tolerance: int = 35
+
+
+class BakeMapsRequest(BaseModel):
+    image_url: str
+    strength: float = 2.0
+    invert_y: bool = False
 
 
 
@@ -142,6 +158,95 @@ def get_service_status():
         "comfyui": comfy_client.check_connection(),
         "lm_studio": lm_client.check_connection(),
         "loaded_modules_count": len(mod_mgr.modules)
+    }
+
+
+@app.post("/api/tools/chroma_key")
+def tool_chroma_key(req: ChromaKeyRequest):
+    """Applies interactive chroma-key background removal with custom color & tolerance."""
+    rel = req.image_url.strip().lstrip("/")
+    if rel.startswith("output/"):
+        rel = rel[len("output/"):]
+    target_path = OUTPUT_DIR / rel
+    if not target_path.exists():
+        raise HTTPException(status_code=404, detail=f"Image not found: {target_path}")
+
+    parsed_color = None
+    if req.color:
+        c = req.color.strip().lstrip("#")
+        if len(c) == 6:
+            try:
+                parsed_color = (int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16))
+            except Exception:
+                pass
+
+    try:
+        img = Image.open(target_path).convert("RGBA")
+        cleaned = SpriteProcessor.make_transparent(img, bg_color=parsed_color, tolerance=req.tolerance)
+        cleaned.save(target_path, format="PNG")
+
+        parent = target_path.parent
+        normal_path = parent / "normal_map.png"
+        depth_path = parent / "depth_map.png"
+        if target_path.name == "spritesheet.png":
+            nm = SpriteProcessor.generate_normal_map(cleaned)
+            nm.save(normal_path, format="PNG")
+            dm = SpriteProcessor.generate_depth_map(cleaned)
+            dm.save(depth_path, format="PNG")
+
+        return {
+            "status": "success",
+            "image_url": f"{req.image_url}?t={int(datetime.now().timestamp())}",
+            "tolerance": req.tolerance,
+            "color": req.color
+        }
+    except Exception as e:
+        logger.error(f"Chroma key processing failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/tools/bake_maps")
+def tool_bake_maps(req: BakeMapsRequest):
+    """Bakes tangent-space 2D normal map and grayscale depth map on demand."""
+    rel = req.image_url.strip().lstrip("/")
+    if rel.startswith("output/"):
+        rel = rel[len("output/"):]
+    target_path = OUTPUT_DIR / rel
+    if not target_path.exists():
+        raise HTTPException(status_code=404, detail=f"Image not found: {target_path}")
+
+    try:
+        img = Image.open(target_path).convert("RGBA")
+        parent = target_path.parent
+        normal_path = parent / "normal_map.png"
+        depth_path = parent / "depth_map.png"
+
+        nm = SpriteProcessor.generate_normal_map(img, strength=req.strength, invert_y=req.invert_y)
+        nm.save(normal_path, format="PNG")
+
+        dm = SpriteProcessor.generate_depth_map(img)
+        dm.save(depth_path, format="PNG")
+
+        base_url = req.image_url.rsplit("/", 1)[0]
+        ts = int(datetime.now().timestamp())
+        return {
+            "status": "success",
+            "normal_map": f"{base_url}/normal_map.png?t={ts}",
+            "depth_map": f"{base_url}/depth_map.png?t={ts}"
+        }
+    except Exception as e:
+        logger.error(f"Map baking failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/perspectives/directions")
+def get_perspective_directions():
+    """Returns the list of 8-way spatial directions and order presets."""
+    return {
+        "directions": persp_mgr.list_directions(),
+        "order_8_way": persp_mgr.ORDER_8_WAY,
+        "order_4_cardinal": persp_mgr.ORDER_4_CARDINAL,
+        "order_isometric_4": persp_mgr.ORDER_ISOMETRIC_4
     }
 
 
@@ -325,7 +430,8 @@ def create_mock_sprite_frame(
     action: str,
     step_idx: int,
     total_steps: int,
-    asset_name: str
+    asset_name: str,
+    direction: str = "S"
 ) -> Image.Image:
     """
     Creates an authentic, stylized placeholder game sprite for instant testing
@@ -366,6 +472,16 @@ def create_mock_sprite_frame(
         # Draw top-down circular head and shoulder nubs
         draw.ellipse([cx - r - 4, cy - r + bob_y, cx + r + 4, cy + r + bob_y], fill=(40, 40, 40, 200))
         draw.ellipse([cx - r, cy - r + bob_y, cx + r, cy + r + bob_y], fill=primary_color, outline=(255, 255, 255, 255))
+        # Directional pointer/eyes
+        dir_vecs = {
+            "N": (0, -1), "NE": (0.7, -0.7), "E": (1, 0), "SE": (0.7, 0.7),
+            "S": (0, 1), "SW": (-0.7, 0.7), "W": (-1, 0), "NW": (-0.7, -0.7)
+        }
+        dx, dy = dir_vecs.get(direction.upper(), (0, 1))
+        eye_dist = r * 0.55
+        pointer_x = cx + int(dx * eye_dist)
+        pointer_y = cy + int(dy * eye_dist) + bob_y
+        draw.ellipse([pointer_x - 3, pointer_y - 3, pointer_x + 3, pointer_y + 3], fill=(255, 255, 255, 255))
         # Foot step indicator
         draw.ellipse([cx - r + stride_x, cy + r + bob_y, cx - r + stride_x + 6, cy + r + bob_y + 6], fill=(240, 240, 240, 255))
     elif perspective == "portrait":
@@ -416,6 +532,9 @@ def create_mock_sprite_frame(
         # Legs
         draw.line([(cx - 4, body_y + r), (cx - 4 + stride_x, ground_y)], fill=(30, 30, 30, 255), width=2)
         draw.line([(cx + 4, body_y + r), (cx + 4 - stride_x, ground_y)], fill=(60, 60, 60, 255), width=2)
+
+        if direction.upper() in ("W", "SW", "NW"):
+            img = SpriteProcessor.mirror_frame(img)
 
     return img
 
@@ -535,26 +654,40 @@ def generate_asset(req: GenerateAssetRequest):
         context["negative_prompt"] = f"{anti_sheet_neg}, {current_neg}".strip(", ")
 
     # 2. Check ComfyUI or fallback to mock demo if requested or offline
+    # 2. Directional suite configuration
+    is_suite = req.direction in ("8_directional", "4_cardinal", "isometric_4")
+    if req.direction == "8_directional":
+        active_directions = persp_mgr.ORDER_8_WAY
+    elif req.direction == "4_cardinal":
+        active_directions = persp_mgr.ORDER_4_CARDINAL
+    elif req.direction == "isometric_4":
+        active_directions = persp_mgr.ORDER_ISOMETRIC_4
+    else:
+        active_directions = [req.direction or "S"]
+
+    # Chroma key color parsing
+    parsed_bg_color = None
+    if req.chroma_color:
+        c = req.chroma_color.strip().lstrip("#")
+        if len(c) == 6:
+            try:
+                parsed_bg_color = (int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16))
+            except Exception:
+                parsed_bg_color = None
+
     comfy_status = comfy_client.check_connection()
     use_mock = req.mock_demo or (not comfy_status.get("online", False))
 
-    frames: List[Image.Image] = []
+    # ComfyUI preparation if not using mock
+    workflow = None
+    latent_w = 512
+    latent_h = 512
+    effective_cfg = req.cfg
+    effective_sampler = req.sampler_name
+    effective_scheduler = req.scheduler
+    master_ref_bytes: Optional[bytes] = None
 
-    if use_mock:
-        logger.info("Using mock generation pipeline (ComfyUI offline or mock requested).")
-        for step_idx in range(req.steps_count):
-            frame = create_mock_sprite_frame(
-                width=req.width,
-                height=req.height,
-                perspective=req.perspective,
-                action=req.action,
-                step_idx=step_idx,
-                total_steps=req.steps_count,
-                asset_name=req.asset_name
-            )
-            frames.append(frame)
-    else:
-        # Load and configure ComfyUI workflow
+    if not use_mock:
         wf_path = WORKFLOWS_DIR / (req.workflow_name or "sprite_sheet_generator.json")
         if not wf_path.exists():
             wf_path = WORKFLOWS_DIR / "pixel_asset_single.json"
@@ -562,10 +695,7 @@ def generate_asset(req: GenerateAssetRequest):
         with open(wf_path, "r", encoding="utf-8") as f:
             workflow_template = json.load(f)
 
-        # Let modules modify workflow
         workflow = mod_mgr.run_workflow_prepare(workflow_template, context)
-
-        # Determine optimal latent dimensions per frame
         is_anima = bool(req.unet and "anima" in req.unet.lower())
 
         if req.perspective == "portrait":
@@ -575,11 +705,6 @@ def generate_asset(req: GenerateAssetRequest):
             latent_w = 512
             latent_h = 512
 
-        effective_cfg = req.cfg
-        effective_sampler = req.sampler_name
-        effective_scheduler = req.scheduler
-
-        # Anima / DiT tuning safeguards (prevent latent burnout to white)
         if is_anima:
             if req.cfg > 4.5:
                 effective_cfg = 4.0
@@ -589,8 +714,6 @@ def generate_asset(req: GenerateAssetRequest):
             if not effective_scheduler or effective_scheduler == "karras":
                 effective_scheduler = "simple"
 
-        # Check if master reference image exists for this character
-        master_ref_bytes: Optional[bytes] = None
         if char_id and req.rubrik == "characters" and req.use_character_reference:
             c_dir = proj_mgr.get_character_dir(req.project_name, char_id)
             m_path = c_dir / "master_reference.png"
@@ -602,92 +725,122 @@ def generate_asset(req: GenerateAssetRequest):
                 except Exception as e:
                     logger.warning(f"Could not read master reference: {e}")
 
-        # Sequential frame-by-frame generation loop
-        raw_frames: List[Image.Image] = []
-        last_frame_bytes: Optional[bytes] = None
-
-        try:
-            for step_i in range(req.steps_count):
-                step_cue = get_step_cue(req.action, step_i, req.steps_count, req.perspective)
-                logger.info(f"Generating Frame {step_i + 1}/{req.steps_count} for {req.asset_name} (Cue: '{step_cue}')")
-
-                ref_comfy_name = None
-                frame_denoise = 1.0
-
-                if step_i == 0:
-                    if master_ref_bytes:
-                        ref_comfy_name = comfy_client.upload_image(master_ref_bytes, filename=f"master_ref_{char_id}.png")
-                        frame_denoise = 0.50
-                        frame_prompt = f"{context['positive_prompt']}, {step_cue}" if step_cue else context['positive_prompt']
-                    else:
-                        ref_comfy_name = None
-                        frame_denoise = 1.0
-                        frame_prompt = f"{context['positive_prompt']}, {step_cue}" if step_cue else context['positive_prompt']
-                else:
-                    if last_frame_bytes:
-                        ref_comfy_name = comfy_client.upload_image(last_frame_bytes, filename=f"frame_ref_{step_i - 1}.png")
-                        frame_denoise = 0.38
-                        frame_prompt = f"{context['positive_prompt']}, {step_cue}, consistent character, identical clothes and style"
-                    else:
-                        frame_denoise = 1.0
-                        frame_prompt = f"{context['positive_prompt']}, {step_cue}"
-
-                configured_wf = comfy_client.inject_parameters(
-                    workflow=workflow,
-                    positive_prompt=frame_prompt,
-                    negative_prompt=context["negative_prompt"],
-                    width=latent_w,
-                    height=latent_h,
-                    seed=seed + (step_i * 7 if step_i > 0 else 0),
-                    steps=req.steps,
-                    cfg=effective_cfg,
-                    checkpoint=req.checkpoint,
-                    unet=req.unet,
-                    lora=req.lora,
-                    lora_strength=req.lora_strength,
-                    vae=req.vae,
-                    sampler_name=effective_sampler,
-                    scheduler=effective_scheduler,
-                    reference_image=ref_comfy_name,
-                    denoise=frame_denoise
-                )
-
-                prompt_id = comfy_client.queue_prompt(configured_wf)
-                image_outputs = comfy_client.wait_for_completion(prompt_id)
-                if not image_outputs:
-                    raise RuntimeError(f"ComfyUI did not return output for frame {step_i + 1}.")
-
-                fn, subf, ftype = image_outputs[0]
-                raw_img_bytes = comfy_client.get_image_data(fn, subf, ftype)
-                frame_img = SpriteProcessor.load_image(raw_img_bytes)
-                raw_frames.append(frame_img)
-
-                from io import BytesIO
-                buf = BytesIO()
-                frame_img.save(buf, format="PNG")
-                last_frame_bytes = buf.getvalue()
-
-            frames = [
-                SpriteProcessor.resize_sprite(rf, req.width, req.height, mode=req.scaling_mode)
-                for rf in raw_frames
-            ]
-
-        except Exception as e:
-            logger.error(f"ComfyUI execution failed: {e}. Falling back to demo preview.")
-            frames = []
+    def generate_direction_frames(d: str) -> List[Image.Image]:
+        dir_cue = persp_mgr.get_direction_prompt(req.perspective, d)
+        if use_mock:
+            d_frames = []
             for step_idx in range(req.steps_count):
-                frames.append(create_mock_sprite_frame(
+                frame = create_mock_sprite_frame(
                     width=req.width,
                     height=req.height,
                     perspective=req.perspective,
                     action=req.action,
                     step_idx=step_idx,
                     total_steps=req.steps_count,
-                    asset_name=req.asset_name
-                ))
+                    asset_name=req.asset_name,
+                    direction=d
+                )
+                d_frames.append(frame)
+            return d_frames
 
-    # 3. Postprocessing hook
-    frames = mod_mgr.run_postprocess(frames, context)
+        raw_frames: List[Image.Image] = []
+        last_frame_bytes: Optional[bytes] = None
+
+        for step_i in range(req.steps_count):
+            step_cue = get_step_cue(req.action, step_i, req.steps_count, req.perspective)
+            cue_parts = [context['positive_prompt']]
+            if dir_cue:
+                cue_parts.append(dir_cue)
+            if step_cue:
+                cue_parts.append(step_cue)
+            if step_i > 0:
+                cue_parts.append("consistent character, identical clothes and style")
+            frame_prompt = ", ".join(cue_parts)
+
+            ref_comfy_name = None
+            frame_denoise = 1.0
+
+            if step_i == 0:
+                if master_ref_bytes:
+                    ref_comfy_name = comfy_client.upload_image(master_ref_bytes, filename=f"master_ref_{char_id}.png")
+                    frame_denoise = 0.50
+            else:
+                if last_frame_bytes:
+                    ref_comfy_name = comfy_client.upload_image(last_frame_bytes, filename=f"frame_ref_{step_i - 1}.png")
+                    frame_denoise = 0.38
+
+            configured_wf = comfy_client.inject_parameters(
+                workflow=workflow,
+                positive_prompt=frame_prompt,
+                negative_prompt=context["negative_prompt"],
+                width=latent_w,
+                height=latent_h,
+                seed=seed + (step_i * 7 if step_i > 0 else 0),
+                steps=req.steps,
+                cfg=effective_cfg,
+                checkpoint=req.checkpoint,
+                unet=req.unet,
+                lora=req.lora,
+                lora_strength=req.lora_strength,
+                vae=req.vae,
+                sampler_name=effective_sampler,
+                scheduler=effective_scheduler,
+                reference_image=ref_comfy_name,
+                denoise=frame_denoise
+            )
+
+            prompt_id = comfy_client.queue_prompt(configured_wf)
+            image_outputs = comfy_client.wait_for_completion(prompt_id)
+            if not image_outputs:
+                raise RuntimeError(f"ComfyUI did not return output for frame {step_i + 1} ({d}).")
+
+            fn, subf, ftype = image_outputs[0]
+            raw_img_bytes = comfy_client.get_image_data(fn, subf, ftype)
+            frame_img = SpriteProcessor.load_image(raw_img_bytes)
+            raw_frames.append(frame_img)
+
+            from io import BytesIO
+            buf = BytesIO()
+            frame_img.save(buf, format="PNG")
+            last_frame_bytes = buf.getvalue()
+
+        return [
+            SpriteProcessor.resize_sprite(rf, req.width, req.height, mode=req.scaling_mode)
+            for rf in raw_frames
+        ]
+
+    # 3. Generate or mirror frames for all active directions
+    directional_frames: Dict[str, List[Image.Image]] = {}
+    for d in active_directions:
+        dir_meta = persp_mgr.get_direction(d)
+        mirror_src = dir_meta.get("mirror_source") if dir_meta else None
+
+        if req.mirror_symmetry and mirror_src and mirror_src in directional_frames:
+            logger.info(f"Auto-mirroring direction {d} horizontally from {mirror_src} (saving generation time).")
+            directional_frames[d] = [
+                SpriteProcessor.mirror_frame(f) for f in directional_frames[mirror_src]
+            ]
+        else:
+            logger.info(f"Generating frames for direction {d} ({req.action})...")
+            try:
+                d_frames = generate_direction_frames(d)
+            except Exception as e:
+                logger.error(f"Generation for direction {d} failed: {e}. Falling back to demo preview.")
+                d_frames = [
+                    create_mock_sprite_frame(
+                        width=req.width,
+                        height=req.height,
+                        perspective=req.perspective,
+                        action=req.action,
+                        step_idx=step_idx,
+                        total_steps=req.steps_count,
+                        asset_name=req.asset_name,
+                        direction=d
+                    )
+                    for step_idx in range(req.steps_count)
+                ]
+            d_frames = mod_mgr.run_postprocess(d_frames, context)
+            directional_frames[d] = d_frames
 
     # 4. Save into structured project directory
     metadata_payload = {
@@ -695,6 +848,8 @@ def generate_asset(req: GenerateAssetRequest):
         "perspective_name": persp_data.get("name", req.perspective),
         "action": req.action,
         "steps_count": req.steps_count,
+        "direction": req.direction,
+        "mirror_symmetry": req.mirror_symmetry,
         "resolution": {"width": req.width, "height": req.height},
         "scaling_mode": req.scaling_mode,
         "positive_prompt": context["positive_prompt"],
@@ -703,12 +858,37 @@ def generate_asset(req: GenerateAssetRequest):
         "is_mock": use_mock,
         "workflow": req.workflow_name,
         "checkpoint": req.checkpoint,
+        "unet": req.unet,
         "lora": req.lora,
         "lora_strength": req.lora_strength,
         "vae": req.vae,
         "sampler_name": req.sampler_name,
-        "scheduler": req.scheduler
+        "scheduler": req.scheduler,
+        "chroma_color": req.chroma_color,
+        "chroma_tolerance": req.chroma_tolerance
     }
+
+    if is_suite and (req.rubrik == "characters" or char_id):
+        c_id = char_id or ProjectManager.sanitize_name(req.asset_name)
+        c_name = req.character_name or (char_data.get("name") if char_data else c_id.replace("_", " ").title())
+        result = proj_mgr.save_character_directional_suite(
+            project_name=req.project_name,
+            character_id=c_id,
+            character_name=c_name,
+            action=req.action,
+            directional_frames=directional_frames,
+            metadata=metadata_payload,
+            fps=req.fps,
+            make_transparent=req.remove_background,
+            directions_order=active_directions,
+            set_as_master=req.set_as_master,
+            bg_color=parsed_bg_color,
+            tolerance=req.chroma_tolerance
+        )
+        return {"status": "success", "asset": result}
+
+    # Single animation fallback
+    primary_frames = directional_frames[active_directions[0]]
 
     if req.rubrik == "characters" or char_id:
         c_id = char_id or ProjectManager.sanitize_name(req.asset_name)
@@ -718,21 +898,25 @@ def generate_asset(req: GenerateAssetRequest):
             character_id=c_id,
             character_name=c_name,
             action=req.action,
-            frames=frames,
+            frames=primary_frames,
             metadata=metadata_payload,
             fps=req.fps,
             make_transparent=req.remove_background,
-            set_as_master=req.set_as_master
+            set_as_master=req.set_as_master,
+            bg_color=parsed_bg_color,
+            tolerance=req.chroma_tolerance
         )
     else:
         result = proj_mgr.save_asset(
             project_name=req.project_name,
             rubrik=req.rubrik,
             asset_name=req.asset_name,
-            frames=frames,
+            frames=primary_frames,
             metadata=metadata_payload,
             fps=req.fps,
-            make_transparent=req.remove_background
+            make_transparent=req.remove_background,
+            bg_color=parsed_bg_color,
+            tolerance=req.chroma_tolerance
         )
 
     return {"status": "success", "asset": result}

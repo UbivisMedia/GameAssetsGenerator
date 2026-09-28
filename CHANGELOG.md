@@ -7,6 +7,22 @@ All notable changes and milestones of the GameAssetGenerator project are documen
 ## [0.3.0] - 2026-09-28
 
 ### Added
+- **8-Directional Movement Generator (Top-Down & Isometric)**:
+  - Added full 8-way directional generation (`S`, `SW`, `W`, `NW`, `N`, `NE`, `E`, `SE`), 4-cardinal (`S`, `W`, `N`, `E`), and 4-isometric (`SE`, `SW`, `NW`, `NE`) movement suites.
+  - Symmetrical Auto-Mirroring: Automatically mirrors right-facing angles (`E`, `SE`, `NE`) from left-facing angles (`W`, `SW`, `NW`), cutting GPU generation time by 40% while guaranteeing exact pixel symmetry.
+  - Multi-Row Directional Spritesheet: Packs all directional animations into structured 2D spritesheets (`spritesheet.png`) with Godot SpriteFrames and Unity Sprite Editor metadata.
+  - Interactive 360° Compass Rose Widget: Added visual compass rose rosette in the Studio UI with mode selector pills and direction display.
+  - Directional Preview Switcher: Allows switching between angles in the animation preview player.
+- **Onion Skinning in Preview Player**:
+  - Toggleable ghost frames (`🧅`) rendering semi-transparent previous and next animation frames directly on the canvas to inspect motion arcs, timing, and spacing.
+- **Interactive Chroma-Key Color Picker**:
+  - Color picker input and Eyedropper tool with live tolerance slider (5–80) in the Studio toolbar.
+  - New endpoint `/api/tools/chroma_key` for boundary-constrained transparency removal without erasing internal character whites.
+- **2D Normal Map & Depth Map Generation**:
+  - Vectorized 3x3 Sobel filter in `SpriteProcessor` baking tangent-space normal maps (`normal_map.png`) and depth maps (`depth_map.png`) directly from spritesheets for dynamic 2D lighting in Godot 4 and Unity URP.
+  - New endpoint `/api/tools/bake_maps` for on-demand map baking.
+  - Spritesheet Map Switcher (Diffuse / Normal Map / Depth Map) and live 2D normal preview shader in player.
+  - Dedicated export buttons for Normal Maps and Depth Maps.
 - **Sequential Frame-by-Frame Generation Engine**:
   - Replaced single-strip slicing with true sequential frame-by-frame generation.
   - Implemented dynamic frame chaining via ComfyUI `/upload/image`, `LoadImage`, and `VAEEncode`.

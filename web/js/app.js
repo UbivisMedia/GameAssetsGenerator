@@ -21,7 +21,15 @@ document.addEventListener('DOMContentLoaded', () => {
     fps: 8,
     zoomLevel: '4x',
     characters: [],
-    selectedCharacter: null
+    selectedCharacter: null,
+    selectedDirection: 'S',
+    directionMode: '8_directional',
+    mirrorSymmetry: true,
+    activePreviewDirection: 'S',
+    onionSkinEnabled: false,
+    normalMapPreview: false,
+    currentMapType: 'diffuse',
+    directionalFramesMap: null
   };
 
   // DOM Elements
@@ -53,6 +61,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const perspectiveCards = document.querySelectorAll('.perspective-card');
   const perspectiveDesc = document.getElementById('perspective-description');
+
+  // Direction & Compass Rosette Elements
+  const directionSection = document.getElementById('direction-section');
+  const directionModeBadge = document.getElementById('direction-mode-badge');
+  const dirModeBtns = document.querySelectorAll('.dir-mode-btn');
+  const compassNodes = document.querySelectorAll('.compass-node');
+  const compassActiveDirLabel = document.getElementById('compass-active-dir-label');
+  const compassActiveDirDesc = document.getElementById('compass-active-dir-desc');
+  const checkMirrorSymmetry = document.getElementById('check-mirror-symmetry');
 
 
   const resPresetsContainer = document.getElementById('resolution-presets');
@@ -109,10 +126,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const playerFpsDisplay = document.getElementById('player-fps-display');
   const zoomBtns = document.querySelectorAll('.zoom-btn');
   const btnToggleGrid = document.getElementById('btn-toggle-grid');
+  const btnToggleOnion = document.getElementById('btn-toggle-onion');
+  const btnToggleNormal = document.getElementById('btn-toggle-normal');
+  const onionFramePrev = document.getElementById('onion-frame-prev');
+  const onionFrameNext = document.getElementById('onion-frame-next');
+  const playerDirectionBar = document.getElementById('player-direction-bar');
+  const playerDirButtons = document.getElementById('player-dir-buttons');
 
   // Export & Tabs
   const exportCard = document.getElementById('export-card');
   const downloadSpritesheet = document.getElementById('download-spritesheet');
+  const downloadNormal = document.getElementById('download-normal');
+  const downloadDepth = document.getElementById('download-depth');
   const downloadGif = document.getElementById('download-gif');
   const downloadWebp = document.getElementById('download-webp');
   const downloadMetadata = document.getElementById('download-metadata');
@@ -121,6 +146,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const tabBtns = document.querySelectorAll('.tab-btn');
   const tabContents = document.querySelectorAll('.tab-content');
 
+  // Spritesheet Viewer & Chroma Tool Elements
+  const mapPillBtns = document.querySelectorAll('.map-pill-btn');
+  const chromaColorPicker = document.getElementById('chroma-color-picker');
+  const btnEyedropper = document.getElementById('btn-eyedropper');
+  const chromaToleranceSlider = document.getElementById('chroma-tolerance-slider');
+  const chromaTolVal = document.getElementById('chroma-tol-val');
+  const btnApplyChroma = document.getElementById('btn-apply-chroma');
+  const btnRebakeMaps = document.getElementById('btn-rebake-maps');
   const spritesheetFullImg = document.getElementById('spritesheet-full-img');
   const spritesheetEmpty = document.getElementById('spritesheet-empty');
   const framesStripGrid = document.getElementById('frames-strip-grid');
@@ -383,6 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
       populateResolutionPresets();
       populateActionButtons();
       updatePerspectiveUI();
+      updateCompassUI();
       updateStepBreakdownUI();
       await loadProjects();
       await loadModels();
@@ -469,6 +503,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const DIR_DESCRIPTIONS = {
+    'N': 'Away (0°)',
+    'NE': 'Right-Up (45°)',
+    'E': 'Right (90°)',
+    'SE': 'Right-Down (135°)',
+    'S': 'Front (180°)',
+    'SW': 'Left-Down (225°)',
+    'W': 'Left (270°)',
+    'NW': 'Left-Up (315°)'
+  };
+
   function updatePerspectiveUI() {
     perspectiveCards.forEach(card => {
       const id = card.dataset.perspective;
@@ -483,6 +528,96 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activePersp && perspectiveDesc) {
       perspectiveDesc.textContent = activePersp.description;
     }
+
+    if (directionSection) {
+      if (state.selectedPerspective === 'top_down' || state.selectedPerspective === 'isometric') {
+        directionSection.style.display = 'block';
+      } else {
+        directionSection.style.display = 'none';
+      }
+    }
+  }
+
+  function updateCompassUI() {
+    if (!compassNodes.length) return;
+
+    dirModeBtns.forEach(btn => {
+      if (btn.dataset.mode === state.directionMode) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    compassNodes.forEach(node => {
+      const d = node.dataset.dir;
+      node.classList.remove('active', 'mirrored');
+
+      if (state.directionMode === 'single') {
+        if (d === state.selectedDirection) {
+          node.classList.add('active');
+        }
+      } else if (state.directionMode === '4_cardinal') {
+        if (['S', 'W', 'N', 'E'].includes(d)) {
+          node.classList.add('active');
+          if (state.mirrorSymmetry && d === 'E') node.classList.add('mirrored');
+        }
+      } else if (state.directionMode === 'isometric_4') {
+        if (['SE', 'SW', 'NW', 'NE'].includes(d)) {
+          node.classList.add('active');
+          if (state.mirrorSymmetry && ['NE', 'SE'].includes(d)) node.classList.add('mirrored');
+        }
+      } else if (state.directionMode === '8_directional') {
+        node.classList.add('active');
+        if (state.mirrorSymmetry && ['E', 'SE', 'NE'].includes(d)) node.classList.add('mirrored');
+      }
+    });
+
+    if (directionModeBadge) {
+      if (state.directionMode === 'single') directionModeBadge.textContent = 'Single Angle';
+      else if (state.directionMode === '4_cardinal') directionModeBadge.textContent = '4-Way Cardinal';
+      else if (state.directionMode === 'isometric_4') directionModeBadge.textContent = '4-Way Isometric';
+      else directionModeBadge.textContent = '8-Way Suite';
+    }
+
+    if (compassActiveDirLabel) {
+      if (state.directionMode === 'single') {
+        compassActiveDirLabel.textContent = state.selectedDirection;
+        compassActiveDirDesc.textContent = DIR_DESCRIPTIONS[state.selectedDirection] || '';
+      } else if (state.directionMode === '4_cardinal') {
+        compassActiveDirLabel.textContent = '4-Way';
+        compassActiveDirDesc.textContent = 'N, E, S, W';
+      } else if (state.directionMode === 'isometric_4') {
+        compassActiveDirLabel.textContent = 'Iso 4';
+        compassActiveDirDesc.textContent = 'SE, SW, NW, NE';
+      } else {
+        compassActiveDirLabel.textContent = '8-Way';
+        compassActiveDirDesc.textContent = 'Full 360°';
+      }
+    }
+  }
+
+  dirModeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.directionMode = btn.dataset.mode;
+      updateCompassUI();
+    });
+  });
+
+  compassNodes.forEach(node => {
+    node.addEventListener('click', () => {
+      const d = node.dataset.dir;
+      state.selectedDirection = d;
+      state.directionMode = 'single';
+      updateCompassUI();
+    });
+  });
+
+  if (checkMirrorSymmetry) {
+    checkMirrorSymmetry.addEventListener('change', (e) => {
+      state.mirrorSymmetry = e.target.checked;
+      updateCompassUI();
+    });
   }
 
   perspectiveCards.forEach(card => {
@@ -814,7 +949,11 @@ document.addEventListener('DOMContentLoaded', () => {
       lora_strength: loraStrengthSlider ? parseFloat(loraStrengthSlider.value) : 1.0,
       vae: vaeSelect ? vaeSelect.value : null,
       sampler_name: samplerSelect ? samplerSelect.value : null,
-      scheduler: schedulerSelect ? schedulerSelect.value : null
+      scheduler: schedulerSelect ? schedulerSelect.value : null,
+      direction: state.directionMode === 'single' ? state.selectedDirection : state.directionMode,
+      mirror_symmetry: checkMirrorSymmetry ? checkMirrorSymmetry.checked : true,
+      chroma_color: chromaColorPicker ? chromaColorPicker.value : null,
+      chroma_tolerance: chromaToleranceSlider ? parseInt(chromaToleranceSlider.value, 10) : 35
     };
 
     if (checkpointSelect && checkpointSelect.value) {
@@ -901,6 +1040,33 @@ document.addEventListener('DOMContentLoaded', () => {
   btnGenerate.addEventListener('click', () => triggerGeneration(false));
   btnGenerateMock.addEventListener('click', () => triggerGeneration(true));
 
+  // --- Helper to get currently active frames array ---
+  function getActiveFramesList() {
+    if (!state.currentAsset) return [];
+    if (state.directionalFramesMap && state.directionalFramesMap[state.activePreviewDirection]) {
+      return state.directionalFramesMap[state.activePreviewDirection];
+    }
+    return (state.currentAsset.paths && state.currentAsset.paths.frames) ? state.currentAsset.paths.frames : [];
+  }
+
+  function renderFramesStrip() {
+    framesStripGrid.innerHTML = '';
+    const frames = getActiveFramesList();
+    if (frames.length === 0) {
+      framesStripGrid.innerHTML = '<p class="text-muted">No individual frames loaded.</p>';
+      return;
+    }
+    frames.forEach((frameUrl, idx) => {
+      const card = document.createElement('div');
+      card.className = 'frame-card';
+      card.innerHTML = `
+        <img src="${frameUrl}" alt="Frame ${idx + 1}">
+        <span class="frame-label">Frame ${idx + 1} (${state.activePreviewDirection || 'S'})</span>
+      `;
+      framesStripGrid.appendChild(card);
+    });
+  }
+
   // --- Display Generated Asset & Preview Player ---
   function displayAsset(asset) {
     state.currentAsset = asset;
@@ -911,7 +1077,37 @@ document.addEventListener('DOMContentLoaded', () => {
     emptyState.style.display = 'none';
     activeFrameImg.style.display = 'block';
 
-    const frames = asset.paths.frames || [];
+    // Directional suite setup
+    if (asset.is_directional && asset.paths.directional_frames) {
+      state.directionalFramesMap = asset.paths.directional_frames;
+      const dirs = Object.keys(asset.paths.directional_frames);
+      state.activePreviewDirection = dirs.includes('S') ? 'S' : dirs[0];
+
+      if (playerDirectionBar && playerDirButtons) {
+        playerDirectionBar.style.display = 'flex';
+        playerDirButtons.innerHTML = '';
+        dirs.forEach(d => {
+          const b = document.createElement('button');
+          b.className = `player-dir-btn ${d === state.activePreviewDirection ? 'active' : ''}`;
+          b.textContent = d;
+          b.title = DIR_DESCRIPTIONS[d] || d;
+          b.addEventListener('click', () => {
+            playerDirButtons.querySelectorAll('.player-dir-btn').forEach(btn => btn.classList.remove('active'));
+            b.classList.add('active');
+            state.activePreviewDirection = d;
+            state.currentFrameIndex = 0;
+            renderCurrentFrame();
+            renderFramesStrip();
+          });
+          playerDirButtons.appendChild(b);
+        });
+      }
+    } else {
+      state.directionalFramesMap = null;
+      if (playerDirectionBar) playerDirectionBar.style.display = 'none';
+    }
+
+    const frames = getActiveFramesList();
     totalFramesCountSpan.textContent = frames.length;
     state.currentFrameIndex = 0;
     renderCurrentFrame();
@@ -924,34 +1120,59 @@ document.addEventListener('DOMContentLoaded', () => {
     downloadMetadata.href = `/output/${asset.project}/${asset.rubrik}/${asset.asset_name}/metadata.json`;
     outputSavedPath.textContent = asset.paths.asset_folder;
 
+    if (downloadNormal) {
+      if (asset.paths.normal_map) {
+        downloadNormal.href = asset.paths.normal_map;
+        downloadNormal.style.display = 'inline-flex';
+      } else {
+        downloadNormal.style.display = 'none';
+      }
+    }
+    if (downloadDepth) {
+      if (asset.paths.depth_map) {
+        downloadDepth.href = asset.paths.depth_map;
+        downloadDepth.style.display = 'inline-flex';
+      } else {
+        downloadDepth.style.display = 'none';
+      }
+    }
+
     // Spritesheet Viewer Tab
+    state.currentMapType = 'diffuse';
+    mapPillBtns.forEach(p => p.classList.toggle('active', p.dataset.map === 'diffuse'));
     spritesheetFullImg.src = asset.paths.spritesheet;
     spritesheetFullImg.style.display = 'block';
     spritesheetEmpty.style.display = 'none';
 
     // Frames Strip Grid Tab
-    framesStripGrid.innerHTML = '';
-    frames.forEach((frameUrl, idx) => {
-      const card = document.createElement('div');
-      card.className = 'frame-card';
-      card.innerHTML = `
-        <img src="${frameUrl}" alt="Frame ${idx + 1}">
-        <span class="frame-label">Frame ${idx + 1}</span>
-      `;
-      framesStripGrid.appendChild(card);
-    });
+    renderFramesStrip();
 
     // Start playing animation
     startAnimation();
   }
 
   function renderCurrentFrame() {
-    if (!state.currentAsset || !state.currentAsset.paths.frames) return;
-    const frames = state.currentAsset.paths.frames;
+    const frames = getActiveFramesList();
     if (frames.length === 0) return;
 
     activeFrameImg.src = frames[state.currentFrameIndex];
     currentFrameIdxSpan.textContent = state.currentFrameIndex + 1;
+    totalFramesCountSpan.textContent = frames.length;
+
+    // Onion Skinning (Ghost Frames)
+    if (state.onionSkinEnabled && frames.length > 1) {
+      const prevIdx = (state.currentFrameIndex - 1 + frames.length) % frames.length;
+      const nextIdx = (state.currentFrameIndex + 1) % frames.length;
+
+      onionFramePrev.src = frames[prevIdx];
+      onionFramePrev.style.display = 'block';
+
+      onionFrameNext.src = frames[nextIdx];
+      onionFrameNext.style.display = 'block';
+    } else {
+      if (onionFramePrev) onionFramePrev.style.display = 'none';
+      if (onionFrameNext) onionFrameNext.style.display = 'none';
+    }
   }
 
   function startAnimation() {
@@ -960,9 +1181,9 @@ document.addEventListener('DOMContentLoaded', () => {
     btnPlayPause.textContent = '⏸️';
     const intervalMs = Math.max(20, Math.floor(1000 / state.fps));
     state.animationInterval = setInterval(() => {
-      if (!state.currentAsset || !state.currentAsset.paths.frames) return;
-      const count = state.currentAsset.paths.frames.length;
-      state.currentFrameIndex = (state.currentFrameIndex + 1) % count;
+      const frames = getActiveFramesList();
+      if (frames.length === 0) return;
+      state.currentFrameIndex = (state.currentFrameIndex + 1) % frames.length;
       renderCurrentFrame();
     }, intervalMs);
   }
@@ -986,17 +1207,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnStepPrev.addEventListener('click', () => {
     stopAnimation();
-    if (!state.currentAsset || !state.currentAsset.paths.frames) return;
-    const count = state.currentAsset.paths.frames.length;
-    state.currentFrameIndex = (state.currentFrameIndex - 1 + count) % count;
+    const frames = getActiveFramesList();
+    if (frames.length === 0) return;
+    state.currentFrameIndex = (state.currentFrameIndex - 1 + frames.length) % frames.length;
     renderCurrentFrame();
   });
 
   btnStepNext.addEventListener('click', () => {
     stopAnimation();
-    if (!state.currentAsset || !state.currentAsset.paths.frames) return;
-    const count = state.currentAsset.paths.frames.length;
-    state.currentFrameIndex = (state.currentFrameIndex + 1) % count;
+    const frames = getActiveFramesList();
+    if (frames.length === 0) return;
+    state.currentFrameIndex = (state.currentFrameIndex + 1) % frames.length;
     renderCurrentFrame();
   });
 
@@ -1007,6 +1228,189 @@ document.addEventListener('DOMContentLoaded', () => {
       startAnimation();
     }
   });
+
+  // Onion Skinning Toggle
+  if (btnToggleOnion) {
+    btnToggleOnion.addEventListener('click', () => {
+      state.onionSkinEnabled = !state.onionSkinEnabled;
+      btnToggleOnion.classList.toggle('active', state.onionSkinEnabled);
+      renderCurrentFrame();
+      showToast(state.onionSkinEnabled ? '🧅 Onion Skinning Enabled (Ghost Frames)' : 'Onion Skinning Disabled');
+    });
+  }
+
+  // Normal Map View Toggle
+  if (btnToggleNormal) {
+    btnToggleNormal.addEventListener('click', () => {
+      if (!state.currentAsset || !state.currentAsset.paths.normal_map) {
+        showToast('No normal map baked for this asset yet.');
+        return;
+      }
+      state.normalMapPreview = !state.normalMapPreview;
+      btnToggleNormal.classList.toggle('active', state.normalMapPreview);
+      if (state.normalMapPreview) {
+        activeFrameImg.style.filter = 'drop-shadow(0 0 8px rgba(130, 130, 255, 0.8)) hue-rotate(180deg) saturate(1.8)';
+        showToast('🔮 2D Normal Map Shader Preview Active');
+      } else {
+        activeFrameImg.style.filter = 'none';
+        showToast('Color (Diffuse) View Active');
+      }
+    });
+  }
+
+  // Spritesheet Map Switcher Pills
+  mapPillBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!state.currentAsset) return;
+      mapPillBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const mapType = btn.dataset.map;
+      state.currentMapType = mapType;
+      const ts = Date.now();
+      if (mapType === 'diffuse') {
+        spritesheetFullImg.src = `${state.currentAsset.paths.spritesheet}?t=${ts}`;
+      } else if (mapType === 'normal') {
+        if (state.currentAsset.paths.normal_map) {
+          spritesheetFullImg.src = `${state.currentAsset.paths.normal_map}?t=${ts}`;
+        } else {
+          showToast('Normal map not baked yet.');
+        }
+      } else if (mapType === 'depth') {
+        if (state.currentAsset.paths.depth_map) {
+          spritesheetFullImg.src = `${state.currentAsset.paths.depth_map}?t=${ts}`;
+        } else {
+          showToast('Depth map not baked yet.');
+        }
+      }
+    });
+  });
+
+  // Chroma-Key Tool Handlers
+  if (chromaToleranceSlider && chromaTolVal) {
+    chromaToleranceSlider.addEventListener('input', (e) => {
+      chromaTolVal.textContent = e.target.value;
+    });
+  }
+
+  if (btnApplyChroma) {
+    btnApplyChroma.addEventListener('click', async () => {
+      if (!state.currentAsset || !state.currentAsset.paths.spritesheet) {
+        showToast('No spritesheet loaded to apply background removal.');
+        return;
+      }
+      btnApplyChroma.disabled = true;
+      btnApplyChroma.textContent = '⏳ Processing...';
+      try {
+        const res = await fetch('/api/tools/chroma_key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image_url: state.currentAsset.paths.spritesheet,
+            color: chromaColorPicker ? chromaColorPicker.value : null,
+            tolerance: parseInt(chromaToleranceSlider.value, 10)
+          })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          showToast('Background removed & normal maps updated!');
+          const ts = Date.now();
+          spritesheetFullImg.src = `${state.currentAsset.paths.spritesheet}?t=${ts}`;
+          renderCurrentFrame();
+        } else {
+          showToast('Chroma key failed');
+        }
+      } catch (e) {
+        showToast('Error applying chroma key');
+      } finally {
+        btnApplyChroma.disabled = false;
+        btnApplyChroma.textContent = 'Remove BG';
+      }
+    });
+  }
+
+  if (btnRebakeMaps) {
+    btnRebakeMaps.addEventListener('click', async () => {
+      if (!state.currentAsset || !state.currentAsset.paths.spritesheet) {
+        showToast('No spritesheet loaded.');
+        return;
+      }
+      btnRebakeMaps.disabled = true;
+      btnRebakeMaps.textContent = '⏳ Baking...';
+      try {
+        const res = await fetch('/api/tools/bake_maps', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image_url: state.currentAsset.paths.spritesheet,
+            strength: 2.0,
+            invert_y: false
+          })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          state.currentAsset.paths.normal_map = data.normal_map;
+          state.currentAsset.paths.depth_map = data.depth_map;
+          if (downloadNormal) {
+            downloadNormal.href = data.normal_map;
+            downloadNormal.style.display = 'inline-flex';
+          }
+          if (downloadDepth) {
+            downloadDepth.href = data.depth_map;
+            downloadDepth.style.display = 'inline-flex';
+          }
+          showToast('Normal Map & Depth Map baked successfully!');
+        } else {
+          showToast('Baking maps failed');
+        }
+      } catch (e) {
+        showToast('Error baking maps');
+      } finally {
+        btnRebakeMaps.disabled = false;
+        btnRebakeMaps.textContent = 'Bake Maps';
+      }
+    });
+  }
+
+  if (btnEyedropper) {
+    btnEyedropper.addEventListener('click', async () => {
+      if (window.EyeDropper) {
+        try {
+          const eyeDropper = new window.EyeDropper();
+          const result = await eyeDropper.open();
+          if (result && result.sRGBHex) {
+            chromaColorPicker.value = result.sRGBHex;
+            showToast(`Sampled color: ${result.sRGBHex}`);
+          }
+        } catch (e) {
+          // cancelled
+        }
+      } else {
+        showToast('Click anywhere on the preview frame to sample color');
+        const pickHandler = (e) => {
+          const canvas = document.createElement('canvas');
+          canvas.width = activeFrameImg.naturalWidth || 64;
+          canvas.height = activeFrameImg.naturalHeight || 64;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(activeFrameImg, 0, 0);
+          const rect = activeFrameImg.getBoundingClientRect();
+          const x = Math.floor((e.clientX - rect.left) / rect.width * canvas.width);
+          const y = Math.floor((e.clientY - rect.top) / rect.height * canvas.height);
+          try {
+            const pixel = ctx.getImageData(x, y, 1, 1).data;
+            const hex = '#' + ((1 << 24) + (pixel[0] << 16) + (pixel[1] << 8) + pixel[2]).toString(16).slice(1);
+            chromaColorPicker.value = hex;
+            showToast(`Sampled color: ${hex}`);
+          } catch (err) {
+            console.warn(err);
+          }
+          activeFrameImg.removeEventListener('click', pickHandler);
+          activeFrameImg.style.cursor = 'default';
+        };
+        activeFrameImg.style.cursor = 'crosshair';
+        activeFrameImg.addEventListener('click', pickHandler, { once: true });
+      }
+    });
+  }
 
   // Zoom Controls
   zoomBtns.forEach(btn => {

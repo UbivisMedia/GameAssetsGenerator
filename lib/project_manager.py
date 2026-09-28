@@ -18,7 +18,7 @@ import re
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from PIL import Image
 
 from .sprite_processor import SpriteProcessor
@@ -138,7 +138,9 @@ class ProjectManager:
         metadata: Dict[str, Any],
         fps: int = 8,
         make_transparent: bool = True,
-        set_as_master: bool = False
+        set_as_master: bool = False,
+        bg_color: Optional[Tuple[int, int, int]] = None,
+        tolerance: int = 35
     ) -> Dict[str, Any]:
         """
         Saves animation under the character group:
@@ -154,7 +156,7 @@ class ProjectManager:
         for i, frame in enumerate(frames):
             img = frame
             if make_transparent:
-                img = SpriteProcessor.make_transparent(img)
+                img = SpriteProcessor.make_transparent(img, bg_color=bg_color, tolerance=tolerance)
             processed_frames.append(img)
             frame_path = frames_dir / f"frame_{i+1:02d}.png"
             img.save(frame_path, format="PNG")
@@ -163,6 +165,15 @@ class ProjectManager:
         spritesheet = SpriteProcessor.pack_spritesheet(processed_frames)
         sheet_path = anim_dir / "spritesheet.png"
         spritesheet.save(sheet_path, format="PNG")
+
+        # Normal Map & Depth Map
+        normal_map = SpriteProcessor.generate_normal_map(spritesheet)
+        normal_path = anim_dir / "normal_map.png"
+        normal_map.save(normal_path, format="PNG")
+
+        depth_map = SpriteProcessor.generate_depth_map(spritesheet)
+        depth_path = anim_dir / "depth_map.png"
+        depth_map.save(depth_path, format="PNG")
 
         # Previews
         gif_path = anim_dir / "preview.gif"
@@ -246,6 +257,8 @@ class ProjectManager:
                 "asset_folder": str(anim_dir),
                 "master_reference": f"/output/{project_name}/characters/{c_dir.name}/master_reference.png",
                 "spritesheet": f"/output/{project_name}/characters/{c_dir.name}/animations/{action}/spritesheet.png",
+                "normal_map": f"/output/{project_name}/characters/{c_dir.name}/animations/{action}/normal_map.png",
+                "depth_map": f"/output/{project_name}/characters/{c_dir.name}/animations/{action}/depth_map.png",
                 "preview_gif": f"/output/{project_name}/characters/{c_dir.name}/animations/{action}/preview.gif",
                 "preview_webp": f"/output/{project_name}/characters/{c_dir.name}/animations/{action}/preview.webp",
                 "frames": [
@@ -254,6 +267,180 @@ class ProjectManager:
                 ]
             },
             "engine_export": engine_meta
+        }
+
+        with open(anim_dir / "metadata.json", "w", encoding="utf-8") as f:
+            json.dump(full_metadata, f, indent=2, ensure_ascii=False)
+
+        return full_metadata
+
+    def save_character_directional_suite(
+        self,
+        project_name: str,
+        character_id: str,
+        character_name: str,
+        action: str,
+        directional_frames: Dict[str, List[Image.Image]],
+        metadata: Dict[str, Any],
+        fps: int = 8,
+        make_transparent: bool = True,
+        directions_order: Optional[List[str]] = None,
+        set_as_master: bool = False,
+        bg_color: Optional[Tuple[int, int, int]] = None,
+        tolerance: int = 35
+    ) -> Dict[str, Any]:
+        """
+        Saves an entire 4-way or 8-way multi-directional animation suite:
+        output/<project>/characters/<character_id>/animations/<action>_directional/
+        - spritesheet.png: 2D multi-row spritesheet (each row = one direction)
+        - preview.gif: cycling animation showing active direction
+        - frames/<direction>/frame_01.png ...
+        - metadata.json: Godot SpriteFrames & Unity Sprite Editor atlas
+        """
+        c_dir = self.get_character_dir(project_name, character_id)
+        suite_action = f"{self.sanitize_name(action)}_directional"
+        anim_dir = c_dir / "animations" / suite_action
+        anim_dir.mkdir(parents=True, exist_ok=True)
+
+        order = directions_order or list(directional_frames.keys())
+        active_dirs = [d for d in order if d in directional_frames and directional_frames[d]]
+
+        processed_directional_frames: Dict[str, List[Image.Image]] = {}
+        all_frames_flat: List[Image.Image] = []
+        frames_paths_dict: Dict[str, List[str]] = {}
+
+        for d in active_dirs:
+            dir_folder = anim_dir / "frames" / d
+            dir_folder.mkdir(parents=True, exist_ok=True)
+            processed_directional_frames[d] = []
+            frames_paths_dict[d] = []
+
+            for i, frame in enumerate(directional_frames[d]):
+                img = frame
+                if make_transparent:
+                    img = SpriteProcessor.make_transparent(img, bg_color=bg_color, tolerance=tolerance)
+                processed_directional_frames[d].append(img)
+                all_frames_flat.append(img)
+
+                f_path = dir_folder / f"frame_{i+1:02d}.png"
+                img.save(f_path, format="PNG")
+                rel_url = f"/output/{project_name}/characters/{c_dir.name}/animations/{suite_action}/frames/{d}/frame_{i+1:02d}.png"
+                frames_paths_dict[d].append(rel_url)
+
+            # Individual direction preview GIF
+            dir_gif_path = anim_dir / f"preview_{d.lower()}.gif"
+            SpriteProcessor.create_animated_gif(processed_directional_frames[d], dir_gif_path, fps=fps)
+
+        # Multi-row directional spritesheet
+        spritesheet, sheet_meta = SpriteProcessor.pack_directional_spritesheet(
+            processed_directional_frames,
+            directions_order=active_dirs
+        )
+        sheet_path = anim_dir / "spritesheet.png"
+        spritesheet.save(sheet_path, format="PNG")
+
+        # Normal Map & Depth Map for Directional Spritesheet
+        normal_map = SpriteProcessor.generate_normal_map(spritesheet)
+        normal_path = anim_dir / "normal_map.png"
+        normal_map.save(normal_path, format="PNG")
+
+        depth_map = SpriteProcessor.generate_depth_map(spritesheet)
+        depth_path = anim_dir / "depth_map.png"
+        depth_map.save(depth_path, format="PNG")
+
+        # Global preview GIF and WebP
+        gif_path = anim_dir / "preview.gif"
+        webp_path = anim_dir / "preview.webp"
+        preview_sample = processed_directional_frames.get("S", processed_directional_frames.get(active_dirs[0]))
+        SpriteProcessor.create_animated_gif(preview_sample, gif_path, fps=fps)
+        SpriteProcessor.create_animated_webp(preview_sample, webp_path, fps=fps)
+
+        # Master reference image
+        master_img_path = c_dir / "master_reference.png"
+        if set_as_master or not master_img_path.exists():
+            preview_sample[0].save(master_img_path, format="PNG")
+
+        # Update character.json
+        char_file = c_dir / "character.json"
+        char_data = {}
+        if char_file.exists():
+            try:
+                with open(char_file, "r", encoding="utf-8") as f:
+                    char_data = json.load(f)
+            except Exception:
+                pass
+
+        if not char_data:
+            char_data = {
+                "character_id": self.sanitize_name(character_id),
+                "name": character_name or character_id.replace("_", " ").title(),
+                "project": project_name,
+                "perspective": metadata.get("perspective", "top_down"),
+                "base_prompt": metadata.get("positive_prompt", ""),
+                "base_negative_prompt": metadata.get("negative_prompt", ""),
+                "seed": metadata.get("seed", -1),
+                "style_id": metadata.get("style_id", ""),
+                "created_at": datetime.now().isoformat(),
+                "animations": {}
+            }
+
+        char_data.setdefault("animations", {})
+        char_data["animations"][suite_action] = {
+            "action": suite_action,
+            "is_directional": True,
+            "directions": active_dirs,
+            "frames_per_direction": len(preview_sample),
+            "fps": fps,
+            "paths": {
+                "spritesheet": f"/output/{project_name}/characters/{c_dir.name}/animations/{suite_action}/spritesheet.png",
+                "preview_gif": f"/output/{project_name}/characters/{c_dir.name}/animations/{suite_action}/preview.gif",
+                "preview_webp": f"/output/{project_name}/characters/{c_dir.name}/animations/{suite_action}/preview.webp"
+            },
+            "updated_at": datetime.now().isoformat()
+        }
+
+        with open(char_file, "w", encoding="utf-8") as f:
+            json.dump(char_data, f, indent=2, ensure_ascii=False)
+
+        frame_w, frame_h = preview_sample[0].size
+        full_metadata = {
+            **metadata,
+            "created_at": datetime.now().isoformat(),
+            "project": project_name,
+            "character_id": c_dir.name,
+            "character_name": char_data.get("name", ""),
+            "rubrik": "characters",
+            "action": suite_action,
+            "asset_name": f"{c_dir.name}_{suite_action}",
+            "is_directional": True,
+            "directions": active_dirs,
+            "total_frames": len(all_frames_flat),
+            "frame_dimensions": {"width": frame_w, "height": frame_h},
+            "fps": fps,
+            "paths": {
+                "asset_folder": str(anim_dir),
+                "master_reference": f"/output/{project_name}/characters/{c_dir.name}/master_reference.png",
+                "spritesheet": f"/output/{project_name}/characters/{c_dir.name}/animations/{suite_action}/spritesheet.png",
+                "normal_map": f"/output/{project_name}/characters/{c_dir.name}/animations/{suite_action}/normal_map.png",
+                "depth_map": f"/output/{project_name}/characters/{c_dir.name}/animations/{suite_action}/depth_map.png",
+                "preview_gif": f"/output/{project_name}/characters/{c_dir.name}/animations/{suite_action}/preview.gif",
+                "preview_webp": f"/output/{project_name}/characters/{c_dir.name}/animations/{suite_action}/preview.webp",
+                "directional_frames": frames_paths_dict,
+                "frames": [
+                    rel_f for d_list in frames_paths_dict.values() for rel_f in d_list
+                ]
+            },
+            "directional_sheet": sheet_meta,
+            "engine_export": {
+                "name": f"{c_dir.name}_{suite_action}",
+                "category": "characters",
+                "perspective": metadata.get("perspective", "top_down"),
+                "is_directional": True,
+                "directions": active_dirs,
+                "frames_count": len(all_frames_flat),
+                "frame_size": {"width": frame_w, "height": frame_h},
+                "spritesheet": sheet_meta
+            }
         }
 
         with open(anim_dir / "metadata.json", "w", encoding="utf-8") as f:
@@ -371,7 +558,9 @@ class ProjectManager:
         frames: List[Image.Image],
         metadata: Dict[str, Any],
         fps: int = 8,
-        make_transparent: bool = True
+        make_transparent: bool = True,
+        bg_color: Optional[Tuple[int, int, int]] = None,
+        tolerance: int = 35
     ) -> Dict[str, Any]:
         """Standard save for general assets."""
         asset_dir = self.get_asset_dir(project_name, rubrik, asset_name)
@@ -382,7 +571,7 @@ class ProjectManager:
         for i, frame in enumerate(frames):
             img = frame
             if make_transparent:
-                img = SpriteProcessor.make_transparent(img)
+                img = SpriteProcessor.make_transparent(img, bg_color=bg_color, tolerance=tolerance)
             processed_frames.append(img)
             frame_path = frames_dir / f"frame_{i+1:02d}.png"
             img.save(frame_path, format="PNG")
@@ -390,6 +579,15 @@ class ProjectManager:
         spritesheet = SpriteProcessor.pack_spritesheet(processed_frames)
         sheet_path = asset_dir / "spritesheet.png"
         spritesheet.save(sheet_path, format="PNG")
+
+        # Normal Map & Depth Map
+        normal_map = SpriteProcessor.generate_normal_map(spritesheet)
+        normal_path = asset_dir / "normal_map.png"
+        normal_map.save(normal_path, format="PNG")
+
+        depth_map = SpriteProcessor.generate_depth_map(spritesheet)
+        depth_path = asset_dir / "depth_map.png"
+        depth_map.save(depth_path, format="PNG")
 
         gif_path = asset_dir / "preview.gif"
         webp_path = asset_dir / "preview.webp"
@@ -421,6 +619,8 @@ class ProjectManager:
             "paths": {
                 "asset_folder": str(asset_dir),
                 "spritesheet": f"/output/{project_name}/{rubrik}/{asset_name}/spritesheet.png",
+                "normal_map": f"/output/{project_name}/{rubrik}/{asset_name}/normal_map.png",
+                "depth_map": f"/output/{project_name}/{rubrik}/{asset_name}/depth_map.png",
                 "preview_gif": f"/output/{project_name}/{rubrik}/{asset_name}/preview.gif",
                 "preview_webp": f"/output/{project_name}/{rubrik}/{asset_name}/preview.webp",
                 "frames": [

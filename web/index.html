@@ -176,6 +176,50 @@
           <p id="perspective-description" class="help-text mt-2"></p>
         </div>
 
+        <!-- Directional Movement & Rosette (Top-Down & Isometric) -->
+        <div class="card section-card" id="direction-section">
+          <div class="card-header flex-between">
+            <div class="flex-align-gap">
+              <span class="card-icon">🧭</span>
+              <h2>Movement Direction (8-Way / 4-Way)</h2>
+            </div>
+            <span class="badge" id="direction-mode-badge">8-Way Suite</span>
+          </div>
+
+          <!-- Mode selector pills -->
+          <div class="direction-mode-selector mb-2">
+            <button type="button" class="dir-mode-btn" data-mode="single">Single View</button>
+            <button type="button" class="dir-mode-btn" data-mode="4_cardinal">4-Way (N, E, S, W)</button>
+            <button type="button" class="dir-mode-btn" data-mode="isometric_4">4-Way (Iso)</button>
+            <button type="button" class="dir-mode-btn active" data-mode="8_directional">Full 8-Way Suite</button>
+          </div>
+
+          <!-- 8-way Compass Rosette Widget -->
+          <div class="compass-wrapper">
+            <div class="compass-rose" id="compass-rosette">
+              <button type="button" class="compass-node" data-dir="NW" title="North-West (315°)">NW</button>
+              <button type="button" class="compass-node" data-dir="N" title="North (0° - Away)">N</button>
+              <button type="button" class="compass-node" data-dir="NE" title="North-East (45°)">NE</button>
+              <button type="button" class="compass-node" data-dir="W" title="West (270° - Left)">W</button>
+              <div class="compass-center" id="compass-center-display">
+                <span class="compass-dir-text" id="compass-active-dir-label">S</span>
+                <span class="compass-sub-text" id="compass-active-dir-desc">Front</span>
+              </div>
+              <button type="button" class="compass-node" data-dir="E" title="East (90° - Right)">E</button>
+              <button type="button" class="compass-node" data-dir="SW" title="South-West (225°)">SW</button>
+              <button type="button" class="compass-node active" data-dir="S" title="South (180° - Forward)">S</button>
+              <button type="button" class="compass-node" data-dir="SE" title="South-East (135°)">SE</button>
+            </div>
+          </div>
+
+          <div class="flex-between mt-2 pt-2 border-top">
+            <label class="checkbox-inline">
+              <input type="checkbox" id="check-mirror-symmetry" checked>
+              <span>Auto-Mirror Symmetry (E from W, SE from SW, NE from NW — saves 40% time)</span>
+            </label>
+          </div>
+        </div>
+
         <!-- Size & Resolution Settings -->
         <div class="card section-card">
           <div class="card-header">
@@ -411,6 +455,8 @@
                 <button class="zoom-btn" data-zoom="8">8x</button>
               </div>
               <div class="stage-options">
+                <button id="btn-toggle-onion" class="tool-btn" title="Toggle Onion Skinning (Ghost Frames)">🧅</button>
+                <button id="btn-toggle-normal" class="tool-btn" title="Toggle 2D Normal Map View">🔮</button>
                 <button id="btn-toggle-grid" class="tool-btn active"
                   title="Toggle Transparency Checkerboard">🏁</button>
                 <button id="btn-toggle-bounds" class="tool-btn" title="Toggle Sprite Bounds Box">📐</button>
@@ -420,7 +466,9 @@
             <!-- Canvas / Sprite Viewport -->
             <div class="sprite-viewport checkerboard" id="sprite-viewport">
               <div id="sprite-container" class="sprite-container zoom-1x">
+                <img id="onion-frame-prev" class="onion-frame onion-prev" src="" alt="" style="display: none;">
                 <img id="active-frame-img" src="" alt="Active Frame" style="display: none;">
+                <img id="onion-frame-next" class="onion-frame onion-next" src="" alt="" style="display: none;">
                 <div id="empty-state" class="empty-state">
                   <div class="empty-icon">🎮</div>
                   <h3>No Asset Generated Yet</h3>
@@ -428,6 +476,12 @@
                       Asset</strong> or <strong>Mock Preview</strong>.</p>
                 </div>
               </div>
+            </div>
+
+            <!-- Directional Playback Switcher (Appears when directional suite is loaded) -->
+            <div id="player-direction-bar" class="player-direction-bar mt-2" style="display: none;">
+              <span class="sub-label">Preview Direction:</span>
+              <div class="player-dir-buttons" id="player-dir-buttons"></div>
             </div>
 
             <!-- Player Controls -->
@@ -454,6 +508,12 @@
               <a id="download-spritesheet" class="export-btn" download>
                 <span>📜 Spritesheet PNG</span>
               </a>
+              <a id="download-normal" class="export-btn" download>
+                <span>🔮 Normal Map</span>
+              </a>
+              <a id="download-depth" class="export-btn" download>
+                <span>⛰️ Depth Map</span>
+              </a>
               <a id="download-gif" class="export-btn" download>
                 <span>🎬 Animated GIF</span>
               </a>
@@ -471,8 +531,30 @@
           </div>
         </div>
 
-        <!-- Tab 2: Spritesheet View -->
+        <!-- Tab 2: Spritesheet View & Chroma-Key Tool -->
         <div id="tab-spritesheet" class="tab-content">
+          <!-- Spritesheet Map Switcher and Chroma-Key Toolbar -->
+          <div class="spritesheet-toolbar card mb-2">
+            <div class="flex-between flex-wrap gap-2">
+              <div class="map-view-pills">
+                <button type="button" class="map-pill-btn active" data-map="diffuse">🎨 Diffuse (Color)</button>
+                <button type="button" class="map-pill-btn" data-map="normal">🔮 Normal Map (Sobel)</button>
+                <button type="button" class="map-pill-btn" data-map="depth">⛰️ Depth Map</button>
+              </div>
+
+              <!-- Chroma-Key Transparency Tool -->
+              <div class="chroma-tool-group">
+                <span class="sub-label">Chroma Key:</span>
+                <input type="color" id="chroma-color-picker" value="#ffffff" title="Pick background color to remove">
+                <button type="button" id="btn-eyedropper" class="mini-btn" title="Pick color directly from sprite">🧪 Eyedropper</button>
+                <label class="chroma-tol-label">Tol: <span id="chroma-tol-val">35</span></label>
+                <input type="range" id="chroma-tolerance-slider" min="5" max="80" value="35" class="form-range mini" style="width: 80px;">
+                <button type="button" id="btn-apply-chroma" class="mini-btn primary-mini" title="Apply background removal with selected color">Remove BG</button>
+                <button type="button" id="btn-rebake-maps" class="mini-btn" title="Re-bake Normal & Depth Maps from active spritesheet">Bake Maps</button>
+              </div>
+            </div>
+          </div>
+
           <div class="spritesheet-container checkerboard" id="spritesheet-viewer">
             <img id="spritesheet-full-img" src="" alt="Full Spritesheet" style="display: none;">
             <p id="spritesheet-empty" class="text-muted">No spritesheet available yet.</p>

@@ -75,3 +75,99 @@ class PerspectiveManager:
                 "angle_degrees": 0.0,
                 "notes": "Flat ground baseline alignment"
             }
+
+    # -------------------------------------------------------------
+    # 8-Directional Movement Definitions & Spatial Prompts
+    # -------------------------------------------------------------
+    DIRECTIONS = {
+        "S": {
+            "id": "S",
+            "name": "South (Down / Front)",
+            "angle": 180,
+            "badge": "Front",
+            "prompt_top_down": "facing camera, front view, moving downwards towards the viewer",
+            "prompt_isometric": "facing down along isometric axis, front view towards viewer",
+            "mirror_source": None
+        },
+        "SW": {
+            "id": "SW",
+            "name": "South-West (Down-Left)",
+            "angle": 225,
+            "badge": "Down-Left",
+            "prompt_top_down": "facing diagonally down-left towards camera, three-quarter front-left view",
+            "prompt_isometric": "isometric view facing down-left along 30-degree isometric grid axis",
+            "mirror_source": None
+        },
+        "W": {
+            "id": "W",
+            "name": "West (Left Profile)",
+            "angle": 270,
+            "badge": "Left",
+            "prompt_top_down": "facing completely leftwards, left side profile view, horizontal movement to the left",
+            "prompt_isometric": "facing left profile along isometric ground plane",
+            "mirror_source": None
+        },
+        "NW": {
+            "id": "NW",
+            "name": "North-West (Up-Left)",
+            "angle": 315,
+            "badge": "Up-Left",
+            "prompt_top_down": "facing diagonally away towards upper-left, three-quarter back-left view, back visible",
+            "prompt_isometric": "isometric view facing away up-left along 30-degree isometric grid axis, back visible",
+            "mirror_source": None
+        },
+        "N": {
+            "id": "N",
+            "name": "North (Up / Back)",
+            "angle": 0,
+            "badge": "Back",
+            "prompt_top_down": "rear view, back facing camera, moving upwards away from the viewer, back of head",
+            "prompt_isometric": "rear view facing upwards away along isometric axis, back facing viewer",
+            "mirror_source": None
+        },
+        "NE": {
+            "id": "NE",
+            "name": "North-East (Up-Right)",
+            "angle": 45,
+            "badge": "Up-Right",
+            "prompt_top_down": "facing diagonally away towards upper-right, three-quarter back-right view, back visible",
+            "prompt_isometric": "isometric view facing away up-right along 30-degree isometric grid axis, back visible",
+            "mirror_source": "NW"
+        },
+        "E": {
+            "id": "E",
+            "name": "East (Right Profile)",
+            "angle": 90,
+            "badge": "Right",
+            "prompt_top_down": "facing completely rightwards, right side profile view, horizontal movement to the right",
+            "prompt_isometric": "facing right profile along isometric ground plane",
+            "mirror_source": "W"
+        },
+        "SE": {
+            "id": "SE",
+            "name": "South-East (Down-Right)",
+            "angle": 135,
+            "badge": "Down-Right",
+            "prompt_top_down": "facing diagonally down-right towards camera, three-quarter front-right view",
+            "prompt_isometric": "isometric view facing down-right along 30-degree isometric grid axis",
+            "mirror_source": "SW"
+        }
+    }
+
+    ORDER_8_WAY = ["S", "SW", "W", "NW", "N", "NE", "E", "SE"]
+    ORDER_4_CARDINAL = ["S", "W", "N", "E"]
+    ORDER_ISOMETRIC_4 = ["SE", "SW", "NW", "NE"]
+
+    def list_directions(self) -> List[Dict[str, Any]]:
+        return [self.DIRECTIONS[k] for k in self.ORDER_8_WAY]
+
+    def get_direction(self, dir_id: str) -> Optional[Dict[str, Any]]:
+        return self.DIRECTIONS.get(dir_id.upper())
+
+    def get_direction_prompt(self, dir_id: str, perspective_id: str = "top_down") -> str:
+        d = self.get_direction(dir_id)
+        if not d:
+            return ""
+        if perspective_id == "isometric":
+            return d.get("prompt_isometric", d.get("prompt_top_down", ""))
+        return d.get("prompt_top_down", "")

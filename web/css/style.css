@@ -1037,3 +1037,266 @@ label {
   0% { opacity: 0.4; }
   100% { opacity: 1; }
 }
+
+/* -------------------------------------------------------------
+   Directional Movement & Compass Rosette Widget
+------------------------------------------------------------- */
+.direction-mode-selector {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dir-mode-btn {
+  flex: 1;
+  min-width: 75px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.dir-mode-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+}
+
+.dir-mode-btn.active {
+  background: rgba(0, 240, 255, 0.12);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  font-weight: 600;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+}
+
+.compass-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 0;
+}
+
+.compass-rose {
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
+  grid-template-rows: repeat(3, 44px);
+  gap: 8px;
+  background: rgba(8, 12, 18, 0.7);
+  padding: 12px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.6);
+}
+
+.compass-node {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.compass-node:hover {
+  background: rgba(0, 240, 255, 0.15);
+  border-color: var(--accent-cyan);
+  color: #fff;
+  transform: scale(1.08);
+}
+
+.compass-node.active {
+  background: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  color: #000;
+  font-weight: bold;
+  box-shadow: var(--glow-cyan);
+}
+
+.compass-node.mirrored {
+  border-style: dashed;
+}
+
+.compass-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 240, 255, 0.05);
+  border: 1px dashed rgba(0, 240, 255, 0.3);
+  border-radius: 8px;
+}
+
+.compass-dir-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+}
+
+.compass-sub-text {
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+/* Directional Playback Switcher */
+.player-direction-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(14, 18, 26, 0.8);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+.player-dir-buttons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.player-dir-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.player-dir-btn:hover {
+  color: var(--text-main);
+  border-color: var(--accent-cyan);
+}
+
+.player-dir-btn.active {
+  background: var(--accent-cyan);
+  color: #000;
+  font-weight: bold;
+}
+
+/* -------------------------------------------------------------
+   Onion Skinning in Preview Stage
+------------------------------------------------------------- */
+.sprite-container {
+  position: relative;
+}
+
+.onion-frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+.onion-prev {
+  opacity: 0.35;
+  filter: drop-shadow(0 0 2px rgba(255, 60, 60, 0.8));
+}
+
+.onion-next {
+  opacity: 0.25;
+  filter: drop-shadow(0 0 2px rgba(60, 160, 255, 0.8));
+}
+
+/* -------------------------------------------------------------
+   Spritesheet Map Switcher & Chroma Tool
+------------------------------------------------------------- */
+.spritesheet-toolbar {
+  padding: 10px 14px;
+  background: rgba(14, 18, 26, 0.8);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.map-view-pills {
+  display: flex;
+  gap: 6px;
+}
+
+.map-pill-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.map-pill-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+}
+
+.map-pill-btn.active {
+  background: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  color: #000;
+  font-weight: bold;
+}
+
+.chroma-tool-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#chroma-color-picker {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+#chroma-color-picker::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+#chroma-color-picker::-webkit-color-swatch {
+  border: none;
+  border-radius: 3px;
+}
+
+.chroma-tol-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.primary-mini {
+  background: rgba(0, 240, 255, 0.15) !important;
+  border-color: var(--accent-cyan) !important;
+  color: var(--accent-cyan) !important;
+}
+
+.primary-mini:hover {
+  background: var(--accent-cyan) !important;
+  color: #000 !important;
+}
+
