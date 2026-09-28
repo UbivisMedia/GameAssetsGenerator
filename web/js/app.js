@@ -78,11 +78,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // AI Models & Engine Elements
   const checkpointSelect = document.getElementById('checkpoint-select');
+  const checkpointLabel = document.getElementById('checkpoint-label');
+  const checkpointRoleHint = document.getElementById('checkpoint-role-hint');
   const checkpointBadge = document.getElementById('checkpoint-badge');
   const loraSelect = document.getElementById('lora-select');
   const loraStrengthSlider = document.getElementById('lora-strength-slider');
   const loraStrengthVal = document.getElementById('lora-strength-val');
   const unetSelect = document.getElementById('unet-select');
+  const unetActiveBadge = document.getElementById('unet-active-badge');
   const vaeSelect = document.getElementById('vae-select');
   const samplerSelect = document.getElementById('sampler-select');
   const schedulerSelect = document.getElementById('scheduler-select');
@@ -245,7 +248,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // 3. UNets
       const unets = data.unets || [];
-      groupItemsByFolder(unets, unetSelect, '-- Use Checkpoint UNet --');
+      groupItemsByFolder(unets, unetSelect, '-- None (Use Checkpoint UNet) --');
+      const savedUnet = localStorage.getItem('gag_unet');
+      if (savedUnet && unets.includes(savedUnet)) {
+        unetSelect.value = savedUnet;
+      }
+      updateModelRoleUI();
 
       // 4. VAEs
       const vaes = data.vaes || [];
@@ -277,6 +285,49 @@ document.addEventListener('DOMContentLoaded', () => {
       if (checkpointBadge) checkpointBadge.textContent = 'Offline';
       console.error('Failed to load ComfyUI models:', e);
     }
+  }
+
+  function updateModelRoleUI() {
+    const hasUnet = unetSelect && unetSelect.value && unetSelect.value.trim() !== '';
+    if (hasUnet) {
+      if (unetActiveBadge) {
+        unetActiveBadge.style.display = 'inline-block';
+      }
+      if (checkpointLabel) {
+        checkpointLabel.textContent = 'CLIP & VAE Provider Checkpoint';
+      }
+      if (checkpointRoleHint) {
+        checkpointRoleHint.textContent = 'Generative model is overridden by Custom UNet below. This Checkpoint provides the CLIP text encoder and VAE decoder.';
+      }
+      if (checkpointBadge) {
+        checkpointBadge.textContent = 'CLIP + VAE Source';
+      }
+    } else {
+      if (unetActiveBadge) {
+        unetActiveBadge.style.display = 'none';
+      }
+      if (checkpointLabel) {
+        checkpointLabel.textContent = 'Diffusion Checkpoint (Base Model)';
+      }
+      if (checkpointRoleHint) {
+        checkpointRoleHint.textContent = 'Standard all-in-one base model (Generative UNet + Text Encoder CLIP + VAE).';
+      }
+      if (checkpointBadge) {
+        const count = (state.models && state.models.checkpoints) ? state.models.checkpoints.length : 0;
+        checkpointBadge.textContent = `${count} available`;
+      }
+    }
+  }
+
+  if (unetSelect) {
+    unetSelect.addEventListener('change', () => {
+      if (unetSelect.value) {
+        localStorage.setItem('gag_unet', unetSelect.value);
+      } else {
+        localStorage.removeItem('gag_unet');
+      }
+      updateModelRoleUI();
+    });
   }
 
   async function loadLMModels() {

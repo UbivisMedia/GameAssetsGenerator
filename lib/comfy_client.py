@@ -83,6 +83,14 @@ class ComfyClient:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 result = json.loads(resp.read().decode("utf-8"))
                 return result.get("prompt_id")
+        except urllib.error.HTTPError as e:
+            err_body = ""
+            try:
+                err_body = e.read().decode("utf-8", errors="ignore")
+            except Exception:
+                pass
+            logger.error(f"Failed to queue prompt to ComfyUI: {e} - Response: {err_body}")
+            raise RuntimeError(f"ComfyUI queue prompt error: {e}. Details: {err_body}")
         except Exception as e:
             logger.error(f"Failed to queue prompt to ComfyUI: {e}")
             raise RuntimeError(f"ComfyUI queue prompt error: {e}")
@@ -121,6 +129,30 @@ class ComfyClient:
             logger.warning(f"Failed to fetch ComfyUI models: {e}")
         return models
 
+    @staticmethod
+    def _resolve_model_name(requested_name: Optional[str], available_list: List[str]) -> Optional[str]:
+        if not requested_name or not available_list:
+            return requested_name
+        if requested_name in available_list:
+            return requested_name
+        norm_back = requested_name.replace("/", "\\")
+        if norm_back in available_list:
+            return norm_back
+        norm_fwd = requested_name.replace("\\", "/")
+        if norm_fwd in available_list:
+            return norm_fwd
+        req_lower = requested_name.lower()
+        norm_back_lower = norm_back.lower()
+        for item in available_list:
+            if item.lower() in (req_lower, norm_back_lower):
+                return item
+        from pathlib import Path
+        req_base = Path(requested_name).name.lower()
+        for item in available_list:
+            if Path(item).name.lower() == req_base:
+                return item
+        return requested_name
+
     def inject_parameters(
         self,
         workflow: Dict[str, Any],
@@ -155,6 +187,9 @@ class ComfyClient:
         # 1. Resolve Checkpoint
         available = self.get_available_models()
         avail_ckpts = available.get("checkpoints", [])
+        avail_unets = available.get("unets", [])
+        avail_loras = available.get("loras", [])
+        avail_vaes = available.get("vaes", [])
 
         # Find CheckpointLoaderSimple node
         ckpt_nodes = [k for k, v in wf.items() if v.get("class_type") in ("CheckpointLoaderSimple", "CheckpointLoader")]
@@ -162,7 +197,8 @@ class ComfyClient:
 
         if ckpt_node_id:
             current_ckpt = wf[ckpt_node_id].get("inputs", {}).get("ckpt_name", "")
-            target_ckpt = checkpoint
+            resolved_ckpt = self._resolve_model_name(checkpoint, avail_ckpts)
+            target_ckpt = resolved_ckpt
 
             # If user didn't specify checkpoint or specified one not in ComfyUI, auto-fallback
             if not target_ckpt or (avail_ckpts and target_ckpt not in avail_ckpts):
@@ -183,11 +219,42 @@ class ComfyClient:
                 wf[ckpt_node_id]["inputs"]["ckpt_name"] = target_ckpt
                 logger.info(f"Using ComfyUI Checkpoint: {target_ckpt}")
 
+        # 1.5. Inject or Configure Custom UNet if requested
+        model_source_node = ckpt_node_id
+        if unet and unet.strip() and unet.lower() not in ("none", "default"):
+            resolved_unet = self._resolve_model_name(unet, avail_unets) or unet
+            existing_unets = [k for k, v in wf.items() if v.get("class_type") == "UNETLoader"]
+            if existing_unets:
+                wf[existing_unets[0]]["inputs"]["unet_name"] = resolved_unet
+                model_source_node = existing_unets[0]
+            else:
+                numeric_ids = [int(k) for k in wf.keys() if k.isdigit()]
+                unet_id = str(max(numeric_ids, default=50) + 1)
+                wf[unet_id] = {
+                    "class_type": "UNETLoader",
+                    "inputs": {
+                        "unet_name": resolved_unet,
+                        "weight_dtype": "default"
+                    },
+                    "_meta": {"title": f"Load Custom UNet ({resolved_unet})"}
+                }
+                # Rewire any node that took model from ckpt_node_id to unet_id
+                for nid, n in wf.items():
+                    if nid in (unet_id, ckpt_node_id):
+                        continue
+                    for in_name, in_val in n.get("inputs", {}).items():
+                        if isinstance(in_val, list) and len(in_val) >= 2:
+                            if str(in_val[0]) == ckpt_node_id and in_val[1] == 0:
+                                n["inputs"][in_name] = [unet_id, 0]
+                model_source_node = unet_id
+            logger.info(f"Using Custom UNet: {resolved_unet} (Overriding Checkpoint diffusion model, CLIP/VAE from {target_ckpt if ckpt_node_id else 'None'})")
+
         # 2. Inject or Configure LoRA if requested
         if lora and lora.strip() and lora.lower() != "none" and ckpt_node_id:
+            resolved_lora = self._resolve_model_name(lora, avail_loras) or lora
             existing_loras = [k for k, v in wf.items() if v.get("class_type") == "LoraLoader"]
             if existing_loras:
-                wf[existing_loras[0]]["inputs"]["lora_name"] = lora
+                wf[existing_loras[0]]["inputs"]["lora_name"] = resolved_lora
                 wf[existing_loras[0]]["inputs"]["strength_model"] = lora_strength
                 wf[existing_loras[0]]["inputs"]["strength_clip"] = lora_strength
             else:
@@ -196,37 +263,38 @@ class ComfyClient:
                 wf[lora_id] = {
                     "class_type": "LoraLoader",
                     "inputs": {
-                        "lora_name": lora,
+                        "lora_name": resolved_lora,
                         "strength_model": lora_strength,
                         "strength_clip": lora_strength,
-                        "model": [ckpt_node_id, 0],
+                        "model": [model_source_node, 0],
                         "clip": [ckpt_node_id, 1]
                     },
-                    "_meta": {"title": f"Load LoRA ({lora})"}
+                    "_meta": {"title": f"Load LoRA ({resolved_lora})"}
                 }
-                # Rewire nodes that connected to ckpt model/clip to lora
+                # Rewire nodes that connected to model_source_node model or ckpt clip to lora
                 for nid, n in wf.items():
-                    if nid in (lora_id, ckpt_node_id):
+                    if nid in (lora_id, model_source_node, ckpt_node_id):
                         continue
                     for in_name, in_val in n.get("inputs", {}).items():
                         if isinstance(in_val, list) and len(in_val) >= 2:
-                            if str(in_val[0]) == ckpt_node_id and in_val[1] == 0:
+                            if str(in_val[0]) == model_source_node and in_val[1] == 0:
                                 n["inputs"][in_name] = [lora_id, 0]
                             elif str(in_val[0]) == ckpt_node_id and in_val[1] == 1:
                                 n["inputs"][in_name] = [lora_id, 1]
-                logger.info(f"Injected LoRA: {lora} (strength: {lora_strength})")
+                logger.info(f"Injected LoRA: {resolved_lora} (strength: {lora_strength})")
 
         # 3. Inject or Configure Custom VAE if requested
         if vae and vae.strip() and vae.lower() != "default":
+            resolved_vae = self._resolve_model_name(vae, avail_vaes) or vae
             existing_vaes = [k for k, v in wf.items() if v.get("class_type") == "VAELoader"]
             if existing_vaes:
-                wf[existing_vaes[0]]["inputs"]["vae_name"] = vae
+                wf[existing_vaes[0]]["inputs"]["vae_name"] = resolved_vae
             else:
                 numeric_ids = [int(k) for k in wf.keys() if k.isdigit()]
                 vae_id = str(max(numeric_ids, default=200) + 2)
                 wf[vae_id] = {
                     "class_type": "VAELoader",
-                    "inputs": {"vae_name": vae},
+                    "inputs": {"vae_name": resolved_vae},
                     "_meta": {"title": f"Load VAE ({vae})"}
                 }
                 for nid, n in wf.items():

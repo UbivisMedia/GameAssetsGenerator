@@ -246,14 +246,29 @@
             <button id="btn-refresh-models" class="mini-btn" title="Refresh ComfyUI and LM Studio Models">↻ Refresh</button>
           </div>
 
+          <!-- Checkpoint -->
           <div class="form-group">
             <div class="flex-between">
-              <label for="checkpoint-select">Diffusion Checkpoint (Base Model)</label>
+              <label for="checkpoint-select" id="checkpoint-label">Diffusion Checkpoint (Base Model)</label>
               <span id="checkpoint-badge" class="badge">Loading models...</span>
             </div>
             <select id="checkpoint-select" class="form-input font-mono"></select>
+            <span id="checkpoint-role-hint" class="help-text">Standard all-in-one base model (Generative UNet + Text Encoder CLIP + VAE).</span>
           </div>
 
+          <!-- Standalone UNet (e.g. Anima) -->
+          <div class="form-group mt-2">
+            <div class="flex-between">
+              <label for="unet-select" id="unet-label">Custom UNet Diffusion Model (e.g. Anima)</label>
+              <span id="unet-active-badge" class="badge" style="display: none; color: var(--accent-cyan); border-color: var(--accent-cyan);">Active Generative Engine</span>
+            </div>
+            <select id="unet-select" class="form-input font-mono">
+              <option value="">-- None (Use Checkpoint's Internal UNet) --</option>
+            </select>
+            <span id="unet-hint" class="help-text">Overrides the checkpoint's UNet with this model. The Checkpoint above automatically supplies CLIP & VAE.</span>
+          </div>
+
+          <!-- LoRA -->
           <div class="form-group mt-2">
             <div class="flex-between">
               <label for="lora-select">LoRA Style / Character (Optional)</label>
@@ -268,20 +283,12 @@
           </div>
 
           <details class="advanced-details mt-2">
-            <summary>Advanced Engine Settings (UNet, VAE, Sampler)</summary>
-            <div class="form-grid two-cols mt-2">
-              <div class="form-group">
-                <label for="unet-select">Custom UNet (Optional)</label>
-                <select id="unet-select" class="form-input font-mono">
-                  <option value="">-- Use Checkpoint UNet --</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="vae-select">Custom VAE (Optional)</label>
-                <select id="vae-select" class="form-input font-mono">
-                  <option value="">-- Baked-in VAE --</option>
-                </select>
-              </div>
+            <summary>Advanced Engine Settings (Custom VAE, Sampler, Scheduler)</summary>
+            <div class="form-group mt-2">
+              <label for="vae-select">Custom VAE (Optional)</label>
+              <select id="vae-select" class="form-input font-mono">
+                <option value="">-- Baked-in VAE from Checkpoint --</option>
+              </select>
             </div>
             <div class="form-grid two-cols mt-2">
               <div class="form-group">
