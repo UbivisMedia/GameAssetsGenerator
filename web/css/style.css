@@ -371,6 +371,106 @@ label {
   cursor: pointer;
 }
 
+/* Game Genre Quick Presets */
+.genre-presets-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .genre-presets-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.genre-preset-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.25s ease;
+  position: relative;
+}
+
+.genre-preset-card:hover {
+  border-color: rgba(255, 183, 3, 0.5);
+  transform: translateY(-2px);
+  background: rgba(255, 183, 3, 0.05);
+}
+
+.genre-preset-card.active {
+  background: linear-gradient(180deg, rgba(255, 183, 3, 0.18) 0%, rgba(251, 133, 0, 0.06) 100%);
+  border-color: #ffb703;
+  box-shadow: 0 0 16px rgba(255, 183, 3, 0.25);
+}
+
+.genre-icon {
+  font-size: 20px;
+  color: #ffb703;
+}
+
+.genre-name {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.genre-badge {
+  font-size: 9px;
+  padding: 2px 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  color: var(--text-muted);
+}
+
+.genre-info-banner {
+  background: rgba(255, 183, 3, 0.06);
+  border: 1px solid rgba(255, 183, 3, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  margin-top: 8px;
+}
+
+.genre-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.genre-info-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffb703;
+}
+
+.genre-info-desc {
+  font-size: 11px;
+  margin: 0 0 6px 0;
+  line-height: 1.4;
+}
+
+.genre-features-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.genre-feature-chip {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
 
 /* Perspective Selector */
 .perspective-cards {

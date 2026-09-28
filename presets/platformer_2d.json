@@ -1,0 +1,30 @@
+{
+  "id": "platformer_2d",
+  "name": "Classic 2D Platformer",
+  "order": 2,
+  "badge": "Side-Scroller",
+  "icon": "bi-joystick",
+  "category": "characters",
+  "description": "Geared towards action platformers and Metroidvanias (Mega Man, Celeste, Hollow Knight). Side-view movement with ground-aligned footing, jump arcs, and attack combos.",
+  "recommended_perspective": "side_view",
+  "recommended_direction_mode": "single",
+  "default_direction": "E",
+  "recommended_actions": ["idle", "walk", "run", "jump", "attack", "crouch", "hurt", "die"],
+  "default_action": "walk",
+  "recommended_resolution": {
+    "width": 64,
+    "height": 64
+  },
+  "recommended_scaling": "nearest",
+  "recommended_fps": 8,
+  "recommended_steps": 6,
+  "recommended_style": "pixel_art_16bit",
+  "prompt_prefix": "pixel art 2d platformer sprite, clean side-view profile silhouette, ground-aligned feet, crisp pixel outlines, arcade action pose",
+  "negative_prompt": "isometric, top down, 3d render, photorealistic, blurry, background scene, landscape, perspective distortion",
+  "remove_background": true,
+  "features": [
+    "Horizontal Auto-Mirroring (E from W)",
+    "Run cycles & jump anticipation poses",
+    "Crisp Nearest-Neighbor pixel grid"
+  ]
+}

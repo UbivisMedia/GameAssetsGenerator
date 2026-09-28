@@ -115,6 +115,28 @@
           </div>
         </div>
 
+        <!-- Game Genre Quick Presets -->
+        <div class="card section-card genre-card">
+          <div class="card-header flex-between">
+            <div class="flex-align-gap">
+              <span class="card-icon">🎮</span>
+              <h2>Game Genre Presets</h2>
+            </div>
+            <span class="badge" id="active-genre-badge">Quick Setup</span>
+          </div>
+          <div class="genre-presets-grid" id="genre-presets-container">
+            <!-- Dynamically populated from /api/genre-presets -->
+          </div>
+          <div id="genre-info-banner" class="genre-info-banner" style="display: none;">
+            <div class="genre-info-header">
+              <span class="genre-info-title" id="genre-info-title">Point & Click Adventure</span>
+              <span class="genre-info-badge badge" id="genre-info-badge">Full Body 3/4</span>
+            </div>
+            <p class="genre-info-desc text-muted" id="genre-info-desc"></p>
+            <div class="genre-features-chips" id="genre-features-chips"></div>
+          </div>
+        </div>
+
         <!-- Perspective Selector -->
         <div class="card section-card">
           <div class="card-header">

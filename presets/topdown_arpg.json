@@ -1,0 +1,30 @@
+{
+  "id": "topdown_arpg",
+  "name": "Top-Down ARPG / Tactics",
+  "order": 4,
+  "badge": "8-Way & 4-Way Suite",
+  "icon": "bi-compass",
+  "category": "characters",
+  "description": "Optimized for Top-Down Action RPGs, Roguelikes, and Tactics games (Zelda, Diablo, Final Fantasy Tactics). Multi-directional 8-way and 4-way spritesheets with auto-mirroring.",
+  "recommended_perspective": "top_down",
+  "recommended_direction_mode": "8_directional",
+  "default_direction": "S",
+  "recommended_actions": ["idle", "walk", "attack", "hurt", "die"],
+  "default_action": "walk",
+  "recommended_resolution": {
+    "width": 64,
+    "height": 64
+  },
+  "recommended_scaling": "nearest",
+  "recommended_fps": 8,
+  "recommended_steps": 4,
+  "recommended_style": "pixel_art_16bit",
+  "prompt_prefix": "top-down RPG sprite, bird-eye 45-degree angled view, visible head shoulders and feet, grid-aligned collision base, crisp clean pixel edges",
+  "negative_prompt": "side view, platformer, horizon, sky, face close up, bust portrait, cut off limbs, stacked heads",
+  "remove_background": true,
+  "features": [
+    "Full 8-Way (or 4-Way Cardinal) Compass Rosette",
+    "Multi-row packed Directional Spritesheet",
+    "Auto-baked Normal & Depth maps for dynamic lighting"
+  ]
+}

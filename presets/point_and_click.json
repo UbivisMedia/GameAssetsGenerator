@@ -1,0 +1,30 @@
+{
+  "id": "point_and_click",
+  "name": "Point & Click Adventure",
+  "order": 1,
+  "badge": "Full Body 3/4",
+  "icon": "bi-cursor-fill",
+  "category": "characters",
+  "description": "Designed for classic and modern Point & Click adventures (Monkey Island, Broken Sword, Deponia). Produces full-length character silhouettes from head to toe with complete shoes, interactive gestures, and dialogue animation.",
+  "recommended_perspective": "full_body",
+  "recommended_direction_mode": "single",
+  "default_direction": "S",
+  "recommended_actions": ["idle", "walk", "talk", "interact", "look"],
+  "default_action": "idle",
+  "recommended_resolution": {
+    "width": 512,
+    "height": 768
+  },
+  "recommended_scaling": "lanczos",
+  "recommended_fps": 6,
+  "recommended_steps": 4,
+  "recommended_style": "hand_drawn_2d",
+  "prompt_prefix": "point and click adventure character sprite, standing 3/4 pose, full length silhouette from head to toe, complete visible shoes, clear readable outlines, game protagonist quality",
+  "negative_prompt": "stacked, vertically stacked, stacked heads, double head, two heads, multiple heads, cloned head, extra face, double bust, two bodies, split image, horizontal split, cropped feet, cut off legs, cropped head, close up, bust shot",
+  "remove_background": true,
+  "features": [
+    "Head-to-Toe Full Body Silhouette",
+    "Point & Click Interaction & Dialogue poses",
+    "Clean BiRefNet AI cutout for game scene placement"
+  ]
+}

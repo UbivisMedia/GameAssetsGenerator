@@ -7,6 +7,15 @@ All notable changes and milestones of the GameAssetGenerator project are documen
 ## [0.3.0] - 2026-09-28
 
 ### Added
+- **Game Genre Quick Presets (`presets/`)**:
+  - Implemented modular file-based Game Genre Presets in `presets/*.json`, automatically loaded and parsed by `ConfigManager`.
+  - Added 4 core genre presets:
+    - `point_and_click.json`: Point & Click Adventure (Full-body 3/4 standing pose, full length silhouette head to toe, interact/look/talk actions, BiRefNet AI cutout).
+    - `platformer_2d.json`: Classic 2D Platformer (Side-view run, jump, crouch, attack, horizontal auto-mirroring, nearest-neighbor pixel filter).
+    - `jrpg_visual_novel.json`: jRPG / Visual Novel (Dialogue avatar bust shot, emotion lip-sync, anime aesthetic).
+    - `topdown_arpg.json`: Top-Down ARPG / Tactics (4-way/8-way directional movement suites, compass rose integration, normal & depth map baking).
+  - Web UI Genre Selector: Interactive cards in Studio header with auto-tuning of perspective, directions, resolution, actions, styling, and background removal in 1 click.
+  - New API endpoint `GET /api/genre-presets` and integrated into `GET /api/config`.
 - **8-Directional Movement Generator (Top-Down & Isometric)**:
   - Added full 8-way directional generation (`S`, `SW`, `W`, `NW`, `N`, `NE`, `E`, `SE`), 4-cardinal (`S`, `W`, `N`, `E`), and 4-isometric (`SE`, `SW`, `NW`, `NE`) movement suites.
   - Symmetrical Auto-Mirroring: Automatically mirrors right-facing angles (`E`, `SE`, `NE`) from left-facing angles (`W`, `SW`, `NW`), cutting GPU generation time by 40% while guaranteeing exact pixel symmetry.

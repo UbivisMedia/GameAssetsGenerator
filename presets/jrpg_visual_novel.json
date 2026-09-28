@@ -1,0 +1,30 @@
+{
+  "id": "jrpg_visual_novel",
+  "name": "jRPG / Visual Novel",
+  "order": 3,
+  "badge": "Portrait & Dialog",
+  "icon": "bi-chat-heart",
+  "category": "characters",
+  "description": "Tailored for dialogue screens, cutscenes, and character cards in Visual Novels and Japanese RPGs. High-detail bust portraits with lip-sync and expressive emotions.",
+  "recommended_perspective": "portrait",
+  "recommended_direction_mode": "single",
+  "default_direction": "S",
+  "recommended_actions": ["talk", "idle"],
+  "default_action": "talk",
+  "recommended_resolution": {
+    "width": 512,
+    "height": 768
+  },
+  "recommended_scaling": "lanczos",
+  "recommended_fps": 6,
+  "recommended_steps": 4,
+  "recommended_style": "anime_aesthetic",
+  "prompt_prefix": "solo, single character, centered bust shot, head and shoulders portrait, jRPG dialogue avatar, high quality face and shoulders, expressive eyes and hair, centered composition, clean solid background",
+  "negative_prompt": "stacked, vertically stacked, stacked heads, double head, two heads, multiple heads, cloned head, extra face, double bust, two bodies, split image, full body, feet, shoes, legs, cropped face",
+  "remove_background": true,
+  "features": [
+    "Centered Bust Framing for Dialogue Boxes",
+    "Talking & Eye Blink Animation Cycles",
+    "High-Detail Anime / Cinematic styling"
+  ]
+}

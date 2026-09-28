@@ -41,7 +41,7 @@ Development and feature roadmap for the GameAssetGenerator project.
 
 ## Version 0.3.0 (Game Genre Presets & Point & Click Adventure Studio)
 
-- [ ] **Game Genre Quick Presets**:
+- [x] **Game Genre Quick Presets**:
   - **Point & Click Adventure**: 3/4 standing full-body (1:2 aspect ratio), walking, interact, look, and multi-layer cloth changes.
   - **Classic 2D Platformer**: Side-view running, jumping arcs, melee attacks, and crouch.
   - **jRPG / Visual Novel**: Bust dialogue portraits, emotion lip-sync, and reaction cutouts.

@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
     resolutions: {},
     animations: [],
     styles: [],
+    genre_presets: [],
+    selectedGenre: null,
     selectedPerspective: 'side_view',
     selectedAction: 'walk',
     selectedSteps: 4,
@@ -58,6 +60,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const newCharacterPrompt = document.getElementById('new-character-prompt');
   const btnModalCharCancel = document.getElementById('btn-modal-char-cancel');
   const btnModalCharConfirm = document.getElementById('btn-modal-char-confirm');
+
+  // Genre Presets Elements
+  const genrePresetsContainer = document.getElementById('genre-presets-container');
+  const genreInfoBanner = document.getElementById('genre-info-banner');
+  const genreInfoTitle = document.getElementById('genre-info-title');
+  const genreInfoBadge = document.getElementById('genre-info-badge');
+  const genreInfoDesc = document.getElementById('genre-info-desc');
+  const genreFeaturesChips = document.getElementById('genre-features-chips');
+  const activeGenreBadge = document.getElementById('active-genre-badge');
 
   const perspectiveCards = document.querySelectorAll('.perspective-card');
   const perspectiveDesc = document.getElementById('perspective-description');
@@ -459,7 +470,9 @@ document.addEventListener('DOMContentLoaded', () => {
       state.animations = data.animations || [];
       state.styles = data.styles || [];
       state.model_presets = data.model_presets || [];
+      state.genre_presets = data.genre_presets || [];
 
+      populateGenrePresets();
       populateCategories();
       populateStyles();
       populateResolutionPresets();
@@ -474,6 +487,144 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error('Config load failed:', e);
       showToast('Error loading configuration');
     }
+  }
+
+  const GENRE_ICONS = {
+    'point_and_click': '🕹️',
+    'platformer_2d': '🏃',
+    'jrpg_visual_novel': '💬',
+    'topdown_arpg': '🧭'
+  };
+
+  function populateGenrePresets() {
+    if (!genrePresetsContainer) return;
+    genrePresetsContainer.innerHTML = '';
+    const presets = state.genre_presets || [];
+    presets.forEach(p => {
+      const card = document.createElement('div');
+      card.className = `genre-preset-card ${state.selectedGenre === p.id ? 'active' : ''}`;
+      card.dataset.genre = p.id;
+      const icon = GENRE_ICONS[p.id] || '🎮';
+      card.innerHTML = `
+        <span class="genre-icon">${icon}</span>
+        <span class="genre-name">${p.name}</span>
+        <span class="genre-badge">${p.badge || 'Preset'}</span>
+      `;
+      card.addEventListener('click', () => {
+        applyGenrePreset(p);
+      });
+      genrePresetsContainer.appendChild(card);
+    });
+  }
+
+  function applyGenrePreset(p) {
+    state.selectedGenre = p.id;
+    if (activeGenreBadge) activeGenreBadge.textContent = p.name;
+    document.querySelectorAll('.genre-preset-card').forEach(c => {
+      c.classList.toggle('active', c.dataset.genre === p.id);
+    });
+
+    if (genreInfoBanner) {
+      genreInfoBanner.style.display = 'block';
+      if (genreInfoTitle) genreInfoTitle.textContent = p.name;
+      if (genreInfoBadge) genreInfoBadge.textContent = p.badge || '';
+      if (genreInfoDesc) genreInfoDesc.textContent = p.description || '';
+      if (genreFeaturesChips) {
+        genreFeaturesChips.innerHTML = '';
+        (p.features || []).forEach(f => {
+          const chip = document.createElement('span');
+          chip.className = 'genre-feature-chip';
+          chip.textContent = `✓ ${f}`;
+          genreFeaturesChips.appendChild(chip);
+        });
+      }
+    }
+
+    // 1. Perspective
+    if (p.recommended_perspective) {
+      state.selectedPerspective = p.recommended_perspective;
+      updatePerspectiveUI();
+    }
+
+    // 2. Direction & Compass
+    if (p.recommended_direction_mode) {
+      state.directionMode = p.recommended_direction_mode;
+    }
+    if (p.default_direction) {
+      state.selectedDirection = p.default_direction;
+    }
+    updateCompassUI();
+
+    // 3. Resolution
+    if (p.recommended_resolution) {
+      widthInput.value = p.recommended_resolution.width;
+      heightInput.value = p.recommended_resolution.height;
+      document.querySelectorAll('.preset-chip').forEach(c => {
+        const matches = (parseInt(c.dataset.w, 10) === p.recommended_resolution.width &&
+                         parseInt(c.dataset.h, 10) === p.recommended_resolution.height);
+        c.classList.toggle('active', matches);
+      });
+    }
+
+    // 4. Scaling filter
+    if (p.recommended_scaling && scalingMode) {
+      scalingMode.value = p.recommended_scaling;
+    }
+
+    // 5. FPS & Steps
+    if (p.recommended_fps) {
+      fpsInput.value = p.recommended_fps;
+      playerFpsSlider.value = p.recommended_fps;
+      playerFpsDisplay.textContent = p.recommended_fps;
+      state.fps = p.recommended_fps;
+    }
+    if (p.recommended_steps) {
+      stepsSlider.value = p.recommended_steps;
+      stepsValDisplay.textContent = p.recommended_steps;
+      state.selectedSteps = p.recommended_steps;
+    }
+
+    // 6. Action selection & recommendation highlights
+    if (p.default_action) {
+      state.selectedAction = p.default_action;
+      document.querySelectorAll('.action-chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.action === p.default_action);
+      });
+    }
+
+    if (p.recommended_actions) {
+      document.querySelectorAll('.action-chip').forEach(c => {
+        const isRec = p.recommended_actions.includes(c.dataset.action);
+        c.style.opacity = isRec ? '1' : '0.45';
+        if (isRec) {
+          c.title = `Recommended for ${p.name}`;
+        } else {
+          c.title = '';
+        }
+      });
+    }
+
+    // 7. Style preset
+    if (p.recommended_style && styleSelect) {
+      styleSelect.value = p.recommended_style;
+      const chosen = state.styles && state.styles.find(s => s.id === p.recommended_style);
+      if (chosen && chosen.negative && negativePrompt) {
+        negativePrompt.value = chosen.negative;
+      }
+    }
+
+    // 8. Auto-cutout / Background removal
+    if (p.remove_background !== undefined && checkRembg) {
+      checkRembg.checked = p.remove_background;
+    }
+
+    // 9. Prompt guidance hint
+    if (p.prompt_prefix && (!promptInput.value || promptInput.value.trim() === '')) {
+      promptInput.placeholder = `e.g. ${p.prompt_prefix}`;
+    }
+
+    updateStepBreakdownUI();
+    showToast(`🎮 Applied Game Genre Preset: ${p.name}`);
   }
 
   function populateCategories() {

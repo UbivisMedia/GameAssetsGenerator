@@ -90,6 +90,66 @@
       }
     },
     {
+      "id": "interact",
+      "name": "Interact (Use / Grab)",
+      "default_steps": 4,
+      "allowed_steps": [3, 4, 6],
+      "recommended_fps": 6,
+      "loop": false,
+      "step_descriptions": {
+        "3": ["Standing neutral reaching arm forward", "Hand grasping object at waist height", "Returning arm to side"],
+        "4": ["Anticipation slight lean forward", "Reaching forward with hand extended", "Manipulating object holding pose", "Retracting hand back to resting stance"]
+      }
+    },
+    {
+      "id": "look",
+      "name": "Look (Inspect / Examine)",
+      "default_steps": 3,
+      "allowed_steps": [2, 3, 4],
+      "recommended_fps": 4,
+      "loop": false,
+      "step_descriptions": {
+        "2": ["Neutral standing pose", "Head turned slightly inspecting object with curious expression"],
+        "3": ["Standing posture", "Leaning slightly forward looking closely with thoughtful gaze", "Returning upright to neutral"]
+      }
+    },
+    {
+      "id": "crouch",
+      "name": "Crouch (Duck / Sneak)",
+      "default_steps": 3,
+      "allowed_steps": [2, 3, 4],
+      "recommended_fps": 6,
+      "loop": false,
+      "step_descriptions": {
+        "2": ["Standing ready", "Low crouch tucking body low to ground"],
+        "3": ["Standing upright", "Bending knees lowering silhouette", "Hold low defensive crouch stance"]
+      }
+    },
+    {
+      "id": "hurt",
+      "name": "Hurt (Hit Reaction)",
+      "default_steps": 3,
+      "allowed_steps": [2, 3, 4],
+      "recommended_fps": 8,
+      "loop": false,
+      "step_descriptions": {
+        "2": ["Impact shock recoil head snapped back", "Recovering balance leaning forward"],
+        "3": ["Sudden impact flinch head tilted", "Body recoiling backward with pain grimace", "Shaking off impact returning to guard"]
+      }
+    },
+    {
+      "id": "die",
+      "name": "Die (Defeat Collapse)",
+      "default_steps": 4,
+      "allowed_steps": [3, 4, 6],
+      "recommended_fps": 8,
+      "loop": false,
+      "step_descriptions": {
+        "3": ["Staggering backward losing balance", "Collapsing onto knees", "Fallen flat motionless on ground"],
+        "4": ["Fatal impact stagger", "Knees buckling falling forward", "Hitting floor with arms sprawled", "Lying completely still defeated"]
+      }
+    },
+    {
       "id": "custom",
       "name": "Custom (User Defined)",
       "default_steps": 4,

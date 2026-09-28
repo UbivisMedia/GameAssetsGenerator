@@ -12,17 +12,34 @@ class ConfigManager:
     def __init__(self, base_dir: Optional[Path] = None):
         self.base_dir = base_dir or Path(__file__).resolve().parent.parent
         self.settings_dir = self.base_dir / "settings"
+        self.presets_dir = self.base_dir / "presets"
         self._cache: Dict[str, Any] = {}
         self.reload_all()
 
     def reload_all(self):
-        """Reloads all JSON configuration files from settings/."""
+        """Reloads all JSON configuration files from settings/ and presets/."""
         self._cache["config"] = self._load_json("config.json", default={})
         self._cache["categories"] = self._load_json("categories.json", default={"categories": []})
         self._cache["perspectives"] = self._load_json("perspectives.json", default={"perspectives": []})
         self._cache["resolutions"] = self._load_json("resolutions.json", default={"presets": [], "scaling_modes": []})
         self._cache["animations"] = self._load_json("animations.json", default={"actions": []})
         self._cache["model_presets"] = self._load_json("model_presets.json", default={"families": []})
+
+        # Load Game Genre Quick Presets from presets/
+        genre_presets = []
+        if self.presets_dir.exists():
+            for p_file in sorted(self.presets_dir.glob("*.json")):
+                try:
+                    with open(p_file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                        if isinstance(data, dict) and "id" in data:
+                            genre_presets.append(data)
+                        elif isinstance(data, list):
+                            genre_presets.extend(data)
+                except Exception as e:
+                    print(f"[ConfigManager] Error reading genre preset {p_file.name}: {e}")
+        genre_presets.sort(key=lambda x: x.get("order", 999))
+        self._cache["genre_presets"] = genre_presets
 
     def _load_json(self, filename: str, default: Any = None) -> Any:
         path = self.settings_dir / filename
@@ -114,4 +131,14 @@ class ConfigManager:
                 return fam
 
         return self.model_presets[0] if self.model_presets else {}
+
+    @property
+    def genre_presets(self) -> List[Dict[str, Any]]:
+        return self._cache.get("genre_presets", [])
+
+    def get_genre_preset(self, preset_id: str) -> Optional[Dict[str, Any]]:
+        for gp in self.genre_presets:
+            if gp.get("id") == preset_id:
+                return gp
+        return None
 

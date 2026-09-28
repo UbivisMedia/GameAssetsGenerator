@@ -310,8 +310,15 @@ def get_system_config():
         "animations": config_mgr.animations,
         "styles": styles,
         "model_presets": config_mgr.model_presets,
+        "genre_presets": config_mgr.genre_presets,
         "modules": mod_mgr.list_modules()
     }
+
+
+@app.get("/api/genre-presets")
+def get_genre_presets():
+    """Returns available Game Genre Quick Presets from presets/."""
+    return {"presets": config_mgr.genre_presets}
 
 
 @app.get("/api/model-presets")
