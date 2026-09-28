@@ -181,8 +181,21 @@ def tool_chroma_key(req: ChromaKeyRequest):
                 pass
 
     try:
-        img = Image.open(target_path).convert("RGBA")
-        cleaned = SpriteProcessor.make_transparent(img, bg_color=parsed_color, tolerance=req.tolerance)
+        cleaned = None
+        if comfy_client.is_online() and not req.color:
+            try:
+                with open(target_path, "rb") as f:
+                    raw_bytes = f.read()
+                clean_bytes = comfy_client.remove_background_birefnet(raw_bytes)
+                cleaned = SpriteProcessor.load_image(clean_bytes)
+                logger.info(f"Applied BiRefNet AI background removal on {target_path}")
+            except Exception as be:
+                logger.warning(f"BiRefNet AI failed, falling back to flood-fill: {be}")
+
+        if cleaned is None:
+            img = Image.open(target_path).convert("RGBA")
+            cleaned = SpriteProcessor.make_transparent(img, bg_color=parsed_color, tolerance=req.tolerance)
+
         cleaned.save(target_path, format="PNG")
 
         parent = target_path.parent
@@ -296,8 +309,16 @@ def get_system_config():
         "resolutions": config_mgr.resolutions,
         "animations": config_mgr.animations,
         "styles": styles,
+        "model_presets": config_mgr.model_presets,
         "modules": mod_mgr.list_modules()
     }
+
+
+@app.get("/api/model-presets")
+def get_model_presets():
+    """Returns general model architecture presets (Anima, SDXL, SD1.5, Flux)."""
+    return {"families": config_mgr.model_presets}
+
 
 
 @app.get("/api/projects")
@@ -613,8 +634,10 @@ def generate_asset(req: GenerateAssetRequest):
         if base_p and base_p.lower() not in effective_prompt.lower():
             effective_prompt = f"{base_p}, {effective_prompt}"
 
-    if req.perspective == "portrait":
-        # Remove contradictory full-body tokens that confuse diffusion models into collage sheets
+    has_lower_body = any(t in effective_prompt.lower() for t in ["shoes", "schuhe", "hose", "pants", "jeans", "feet", "legs", "stöckelschuhe", "boots", "full body", "ganzkörper"])
+
+    if req.perspective == "portrait" and not has_lower_body:
+        # Remove contradictory full-body tokens only for pure head/bust portraits
         import re
         for bad_token in ["full body view sprite", "full body view", "full body", "feet visible", "standing full length", "standing pose"]:
             effective_prompt = re.sub(re.escape(bad_token), "", effective_prompt, flags=re.IGNORECASE)
@@ -640,17 +663,20 @@ def generate_asset(req: GenerateAssetRequest):
     }
     context = mod_mgr.run_prompt_prepare(context)
 
-    # Ensure negative prompt always contains anti-sheet & anti-collage safeguards
+    # Ensure negative prompt always contains anti-stacking, anti-sheet & anti-collage safeguards
     anti_sheet_neg = (
+        "stacked, vertically stacked, stacked heads, double head, two heads, multiple heads, "
+        "cloned head, extra face, double bust, two bodies, split image, horizontal split, two people, twin, diptych, "
         "multiple characters, multiple views, character sheet, expressions sheet, "
-        "portrait sheet, collage, montage, side by side, extra heads, duplicate heads, "
-        "cloned face, border avatars, icons, split view, multi-panel"
+        "portrait sheet, collage, montage, side by side, border avatars, icons, split view, multi-panel"
     )
-    if req.perspective == "portrait":
+    if req.perspective == "portrait" and not has_lower_body:
         anti_sheet_neg += ", full body, feet, shoes, legs, standing full length"
+    elif req.perspective in ("full_body", "side_view") or has_lower_body:
+        anti_sheet_neg += ", cropped feet, cut off legs, cropped head, close up, headshot"
 
     current_neg = context.get("negative_prompt", "")
-    if "multiple characters" not in current_neg:
+    if "stacked" not in current_neg:
         context["negative_prompt"] = f"{anti_sheet_neg}, {current_neg}".strip(", ")
 
     # 2. Check ComfyUI or fallback to mock demo if requested or offline
@@ -683,6 +709,7 @@ def generate_asset(req: GenerateAssetRequest):
     latent_w = 512
     latent_h = 512
     effective_cfg = req.cfg
+    effective_steps = req.steps
     effective_sampler = req.sampler_name
     effective_scheduler = req.scheduler
     master_ref_bytes: Optional[bytes] = None
@@ -696,23 +723,46 @@ def generate_asset(req: GenerateAssetRequest):
             workflow_template = json.load(f)
 
         workflow = mod_mgr.run_workflow_prepare(workflow_template, context)
-        is_anima = bool(req.unet and "anima" in req.unet.lower())
+        # General Model Architecture Preset Lookup
+        effective_model_name = req.unet or req.checkpoint or ""
+        model_family = config_mgr.get_model_preset(effective_model_name)
+        fam_defaults = model_family.get("defaults", {})
+        fam_id = model_family.get("id", "sd15_pixel")
+        logger.info(f"Active Model Family: {model_family.get('name')} (id: {fam_id}) for '{effective_model_name}'")
 
-        if req.perspective == "portrait":
-            latent_w = 512
-            latent_h = 768
+        has_lower_body = any(t in req.prompt.lower() for t in ["shoes", "schuhe", "hose", "pants", "jeans", "feet", "legs", "stöckelschuhe", "boots", "full body", "ganzkörper"])
+
+        # 1. Native Latent Resolution from Architecture Preset
+        native_lat = fam_defaults.get("native_latent", {})
+        if req.perspective in ("full_body", "side_scroller", "fighting_game") or (req.perspective == "portrait" and has_lower_body):
+            dim = native_lat.get("full_body") or native_lat.get("portrait", {"width": 896, "height": 1152})
+        elif req.perspective == "portrait":
+            dim = native_lat.get("portrait", {"width": 896, "height": 1024})
+        elif req.width > req.height:
+            dim = native_lat.get("landscape", {"width": 1152, "height": 896})
         else:
-            latent_w = 512
-            latent_h = 512
+            dim = native_lat.get("square", {"width": 1024, "height": 1024})
+        latent_w = dim.get("width", 512)
+        latent_h = dim.get("height", 512)
 
-        if is_anima:
-            if req.cfg > 4.5:
-                effective_cfg = 4.0
-                logger.info(f"Auto-tuning Anima CFG from {req.cfg} to 4.0 to prevent latent saturation.")
-            if not effective_sampler or effective_sampler == "euler_ancestral":
-                effective_sampler = "euler"
-            if not effective_scheduler or effective_scheduler == "karras":
-                effective_scheduler = "simple"
+        # 2. Sampler, Scheduler, Steps & CFG Auto-tuning
+        if not effective_sampler or effective_sampler == "euler_ancestral":
+            effective_sampler = fam_defaults.get("sampler_name", "euler_ancestral")
+        if not effective_scheduler or effective_scheduler in ("karras", "normal"):
+            effective_scheduler = fam_defaults.get("scheduler", "normal")
+        if (effective_cfg == 7.5 or effective_cfg > 4.5) and "cfg" in fam_defaults and fam_defaults["cfg"] < 5.0:
+            effective_cfg = fam_defaults["cfg"]
+            logger.info(f"Auto-tuning CFG to {effective_cfg} based on {model_family.get('name')} preset.")
+        if effective_steps == 25 and "steps" in fam_defaults:
+            effective_steps = fam_defaults["steps"]
+
+        # 3. Cleanse accidental anti-photo tokens if family specifies
+        if fam_defaults.get("purge_anti_photo_negatives"):
+            clean_neg = context.get("negative_prompt", "")
+            import re
+            for bad_neg in ["photorealistic", "photo", "realistic", "3d render", "3D render"]:
+                clean_neg = re.sub(r'\b' + re.escape(bad_neg) + r'\b', '', clean_neg, flags=re.IGNORECASE)
+            context["negative_prompt"] = re.sub(r',\s*,', ',', clean_neg).strip(' ,')
 
         if char_id and req.rubrik == "characters" and req.use_character_reference:
             c_dir = proj_mgr.get_character_dir(req.project_name, char_id)
@@ -776,7 +826,7 @@ def generate_asset(req: GenerateAssetRequest):
                 width=latent_w,
                 height=latent_h,
                 seed=seed + (step_i * 7 if step_i > 0 else 0),
-                steps=req.steps,
+                steps=effective_steps,
                 cfg=effective_cfg,
                 checkpoint=req.checkpoint,
                 unet=req.unet,
@@ -786,7 +836,9 @@ def generate_asset(req: GenerateAssetRequest):
                 sampler_name=effective_sampler,
                 scheduler=effective_scheduler,
                 reference_image=ref_comfy_name,
-                denoise=frame_denoise
+                denoise=frame_denoise,
+                model_preset=model_family,
+                remove_background=req.remove_background
             )
 
             prompt_id = comfy_client.queue_prompt(configured_wf)

@@ -320,51 +320,90 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function getModelFamily(modelName) {
+    if (!state.model_presets || !state.model_presets.length) return null;
+    if (!modelName) {
+      return state.model_presets.find(f => (f.match_patterns || []).includes('*')) || state.model_presets[0];
+    }
+    const lower = modelName.toLowerCase().replace(/\\/g, '/');
+    for (const fam of state.model_presets) {
+      for (const pat of fam.match_patterns || []) {
+        if (pat !== '*' && lower.includes(pat)) {
+          return fam;
+        }
+      }
+    }
+    return state.model_presets.find(f => (f.match_patterns || []).includes('*')) || state.model_presets[0];
+  }
+
   function updateModelRoleUI() {
     const hasUnet = unetSelect && unetSelect.value && unetSelect.value.trim() !== '';
-    const isAnima = hasUnet && unetSelect.value.toLowerCase().includes('anima');
+    const activeModel = hasUnet ? unetSelect.value : (checkpointSelect ? checkpointSelect.value : '');
+    const family = getModelFamily(activeModel);
 
-    if (isAnima) {
-      if (unetActiveBadge) {
-        unetActiveBadge.style.display = 'inline-block';
-        unetActiveBadge.textContent = 'Active Anima Engine (Qwen + Wan VAE)';
+    if (family) {
+      const famDef = family.defaults || {};
+
+      if (hasUnet) {
+        if (unetActiveBadge) {
+          unetActiveBadge.style.display = 'inline-block';
+          unetActiveBadge.textContent = `Architecture: ${family.badge || family.name}`;
+        }
+        if (checkpointLabel) {
+          checkpointLabel.textContent = family.id === 'anima_dit'
+            ? 'Diffusion Checkpoint (Auto-Bypassed)'
+            : 'CLIP & VAE Provider Checkpoint';
+        }
+        if (checkpointRoleHint) {
+          checkpointRoleHint.textContent = family.id === 'anima_dit'
+            ? 'Anima uses its native Qwen text encoder and Qwen Image VAE. Checkpoint is bypassed.'
+            : `${family.name}: Generative engine overridden by UNet below.`;
+        }
+        if (checkpointBadge) {
+          checkpointBadge.textContent = family.id === 'anima_dit' ? 'Bypassed (DiT Mode)' : 'CLIP + VAE Source';
+        }
+      } else {
+        if (unetActiveBadge) unetActiveBadge.style.display = 'none';
+        if (checkpointLabel) checkpointLabel.textContent = `Diffusion Checkpoint (${family.badge || 'Base Model'})`;
+        if (checkpointRoleHint) checkpointRoleHint.textContent = family.description || 'Standard all-in-one base model.';
+        if (checkpointBadge) {
+          const count = (state.models && state.models.checkpoints) ? state.models.checkpoints.length : 0;
+          checkpointBadge.textContent = `${family.badge || ''} (${count} avail)`.trim();
+        }
       }
-      if (checkpointLabel) {
-        checkpointLabel.textContent = 'Diffusion Checkpoint (Auto-Bypassed)';
+
+      // Auto-tune UI parameters according to family defaults
+      if (famDef.sampler_name && samplerSelect) {
+        const opt = Array.from(samplerSelect.options).find(o => o.value === famDef.sampler_name);
+        if (opt) samplerSelect.value = famDef.sampler_name;
       }
-      if (checkpointRoleHint) {
-        checkpointRoleHint.textContent = 'Anima uses its dedicated Qwen 0.6B text encoder and Wan 2.1 VAE automatically. Checkpoint is bypassed.';
+      if (famDef.scheduler && schedulerSelect) {
+        const opt = Array.from(schedulerSelect.options).find(o => o.value === famDef.scheduler);
+        if (opt) schedulerSelect.value = famDef.scheduler;
       }
-      if (checkpointBadge) {
-        checkpointBadge.textContent = 'Bypassed (DiT Mode)';
+      const cfgSlider = document.getElementById('cfg-slider');
+      const cfgVal = document.getElementById('cfg-val');
+      if (cfgSlider && famDef.cfg !== undefined) {
+        cfgSlider.value = famDef.cfg.toString();
+        if (cfgVal) cfgVal.textContent = famDef.cfg.toString();
       }
-    } else if (hasUnet) {
-      if (unetActiveBadge) {
-        unetActiveBadge.style.display = 'inline-block';
-        unetActiveBadge.textContent = 'Active Generative Engine';
+      const comfySteps = document.getElementById('comfy-steps');
+      if (comfySteps && famDef.steps) {
+        comfySteps.value = famDef.steps.toString();
       }
-      if (checkpointLabel) {
-        checkpointLabel.textContent = 'CLIP & VAE Provider Checkpoint';
+      if (famDef.recommended_scaling && scalingMode) {
+        const scaleOpt = Array.from(scalingMode.options).find(o => o.value === famDef.recommended_scaling);
+        if (scaleOpt) scalingMode.value = famDef.recommended_scaling;
       }
-      if (checkpointRoleHint) {
-        checkpointRoleHint.textContent = 'Generative model is overridden by Custom UNet below. This Checkpoint provides the CLIP text encoder and VAE decoder.';
-      }
-      if (checkpointBadge) {
-        checkpointBadge.textContent = 'CLIP + VAE Source';
-      }
-    } else {
-      if (unetActiveBadge) {
-        unetActiveBadge.style.display = 'none';
-      }
-      if (checkpointLabel) {
-        checkpointLabel.textContent = 'Diffusion Checkpoint (Base Model)';
-      }
-      if (checkpointRoleHint) {
-        checkpointRoleHint.textContent = 'Standard all-in-one base model (Generative UNet + Text Encoder CLIP + VAE).';
-      }
-      if (checkpointBadge) {
-        const count = (state.models && state.models.checkpoints) ? state.models.checkpoints.length : 0;
-        checkpointBadge.textContent = `${count} available`;
+      if (famDef.recommended_style && styleSelect) {
+        const styleOpt = Array.from(styleSelect.options).find(o => o.value === famDef.recommended_style);
+        if (styleOpt && (styleSelect.value.startsWith('pixel_art') && family.id !== 'sd15_pixel')) {
+          styleSelect.value = famDef.recommended_style;
+          const chosen = state.styles && state.styles.find(s => s.id === famDef.recommended_style);
+          if (chosen && chosen.negative && negativePrompt) {
+            negativePrompt.value = chosen.negative;
+          }
+        }
       }
     }
   }
@@ -375,6 +414,15 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('gag_unet', unetSelect.value);
       } else {
         localStorage.removeItem('gag_unet');
+      }
+      updateModelRoleUI();
+    });
+  }
+
+  if (checkpointSelect) {
+    checkpointSelect.addEventListener('change', () => {
+      if (checkpointSelect.value) {
+        localStorage.setItem('gag_checkpoint', checkpointSelect.value);
       }
       updateModelRoleUI();
     });
@@ -410,6 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.resolutions = data.resolutions || {};
       state.animations = data.animations || [];
       state.styles = data.styles || [];
+      state.model_presets = data.model_presets || [];
 
       populateCategories();
       populateStyles();
@@ -450,6 +499,15 @@ document.addEventListener('DOMContentLoaded', () => {
       opt.value = s.id;
       opt.textContent = s.name;
       styleSelect.appendChild(opt);
+    });
+  }
+
+  if (styleSelect) {
+    styleSelect.addEventListener('change', () => {
+      const chosen = state.styles && state.styles.find(s => s.id === styleSelect.value);
+      if (chosen && chosen.negative && negativePrompt) {
+        negativePrompt.value = chosen.negative;
+      }
     });
   }
 

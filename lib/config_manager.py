@@ -22,6 +22,7 @@ class ConfigManager:
         self._cache["perspectives"] = self._load_json("perspectives.json", default={"perspectives": []})
         self._cache["resolutions"] = self._load_json("resolutions.json", default={"presets": [], "scaling_modes": []})
         self._cache["animations"] = self._load_json("animations.json", default={"actions": []})
+        self._cache["model_presets"] = self._load_json("model_presets.json", default={"families": []})
 
     def _load_json(self, filename: str, default: Any = None) -> Any:
         path = self.settings_dir / filename
@@ -89,3 +90,28 @@ class ConfigManager:
             if r.get("id") == preset_id:
                 return r
         return None
+
+    @property
+    def model_presets(self) -> List[Dict[str, Any]]:
+        return self._cache.get("model_presets", {}).get("families", [])
+
+    def get_model_preset(self, model_name: Optional[str]) -> Dict[str, Any]:
+        """Finds matching model architecture preset based on filename patterns."""
+        if not model_name:
+            fallback = next((f for f in self.model_presets if "*" in f.get("match_patterns", [])), None)
+            return fallback or (self.model_presets[0] if self.model_presets else {})
+
+        name_lower = model_name.lower().replace("\\", "/")
+        # 1. Exact or substring match (excluding wildcard)
+        for fam in self.model_presets:
+            for pat in fam.get("match_patterns", []):
+                if pat != "*" and pat in name_lower:
+                    return fam
+
+        # 2. Wildcard fallback
+        for fam in self.model_presets:
+            if "*" in fam.get("match_patterns", []):
+                return fam
+
+        return self.model_presets[0] if self.model_presets else {}
+

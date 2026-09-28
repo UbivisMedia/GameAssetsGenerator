@@ -156,7 +156,9 @@ class ProjectManager:
         for i, frame in enumerate(frames):
             img = frame
             if make_transparent:
-                img = SpriteProcessor.make_transparent(img, bg_color=bg_color, tolerance=tolerance)
+                already_transparent = img.mode == "RGBA" and (min(img.split()[-1].getextrema()) < 128)
+                if not already_transparent:
+                    img = SpriteProcessor.make_transparent(img, bg_color=bg_color, tolerance=tolerance)
             processed_frames.append(img)
             frame_path = frames_dir / f"frame_{i+1:02d}.png"
             img.save(frame_path, format="PNG")
@@ -318,7 +320,9 @@ class ProjectManager:
             for i, frame in enumerate(directional_frames[d]):
                 img = frame
                 if make_transparent:
-                    img = SpriteProcessor.make_transparent(img, bg_color=bg_color, tolerance=tolerance)
+                    already_transparent = img.mode == "RGBA" and (min(img.split()[-1].getextrema()) < 128)
+                    if not already_transparent:
+                        img = SpriteProcessor.make_transparent(img, bg_color=bg_color, tolerance=tolerance)
                 processed_directional_frames[d].append(img)
                 all_frames_flat.append(img)
 
@@ -571,7 +575,9 @@ class ProjectManager:
         for i, frame in enumerate(frames):
             img = frame
             if make_transparent:
-                img = SpriteProcessor.make_transparent(img, bg_color=bg_color, tolerance=tolerance)
+                already_transparent = img.mode == "RGBA" and (min(img.split()[-1].getextrema()) < 128)
+                if not already_transparent:
+                    img = SpriteProcessor.make_transparent(img, bg_color=bg_color, tolerance=tolerance)
             processed_frames.append(img)
             frame_path = frames_dir / f"frame_{i+1:02d}.png"
             img.save(frame_path, format="PNG")

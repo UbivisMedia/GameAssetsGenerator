@@ -28,14 +28,36 @@ All notable changes and milestones of the GameAssetGenerator project are documen
   - Implemented dynamic frame chaining via ComfyUI `/upload/image`, `LoadImage`, and `VAEEncode`.
   - Frame $i$ references Frame $i-1$ via latent img2img (`denoise: 0.38`), ensuring 100% character identity, clothing, hair, and lighting consistency while cleanly articulating movement (mouth lip sync, eye blinks).
   - Automatic `master_reference.png` initialization for Frame 1.
+- **Model Architecture Preset Table (`settings/model_presets.json`)**:
+  - Implemented a unified configuration table mapping entire model families (Anima DiT, SDXL / Pony / Illustrious, Flux.1, and SD 1.5) to their recommended defaults (Sampler, Scheduler, Steps, CFG, Native Resolution, VAE candidates, Text Encoders, Scaling Mode).
+  - Dynamic Pattern Matching: Automatically detects the model family from model filenames/paths (e.g. `Anima\...`, `*pony*`, `*sdxl*`, `*flux*`) with fallback to SD 1.5 classic.
+  - New API endpoint `GET /api/model-presets` and integrated into `GET /api/config`.
+  - Frontend Auto-Tuning: Switching Checkpoints or UNets in the Studio UI dynamically updates badges, role hints, recommended samplers, schedulers, and inference settings based on the architecture table.
 - **Portrait & Bust Resolution Presets**:
   - Added `256x384` (Portrait Bust), `512x768` (HD Dialogue Portrait), and `512x1024` (Visual Novel Full Bust) to `settings/resolutions.json`.
   - Auto-selects `512x768` upon selecting the Portrait perspective in the Studio UI.
 
 ### Fixed
+- **Anima Aesthetic & Photorealistic Pipeline Alignment (Movie Generator Match)**:
+  - Fixed VAE selection in `lib/comfy_client.py`: Prioritized native `qwen_image_vae.safetensors` over Wan 2.1 video VAE, resolving gray/blank/corrupted outputs.
+  - Aligned Sampler & Scheduler: Configured `er_sde` with `beta57` (at 28 steps and CFG 4.0), replacing flat Euler/simple diffusion for crisp, studio-grade photorealism.
+  - Native Megapixel Latent Scaling: Anima DiT models now generate at native high resolution (`896x1152` for portrait/tall full-body, `1024x1024` for square) before high-fidelity downsampling, eliminating latent collapse.
+  - Style Preset Overhaul: Added `Photorealistic / Cinematic (Movie Generator Style)` and `Anime Aesthetic` to `prompts/style_presets.json`.
+  - Negative Prompt Sanitation: Automatically purges anti-photorealistic keywords (`photo`, `realistic`, `3D render`) when using Anima models or cinematic styles.
+  - Studio UI Auto-Tuning: Automatically switches sampler, scheduler, CFG, and style preset when selecting Anima UNet models.
 - **Elimination of Multi-Head Collage / Expression Sheet Artifacts**:
   - Removed ambiguous plural prompt tokens (`frames`, `speech portrait frames`, `cycle sequence`) in `modules/character_animator.py` and `prompts/animation_breakdowns.json` that caused diffusion models to render collage sheets.
   - Added comprehensive negative prompt guards against multiple characters, character sheets, expressions sheets, collages, duplicate heads, and border icons.
+- **BiRefNet AI Background Removal (Movie Generator Standard)**:
+  - Replaced CPU flood-fill chroma keying with the neural AI background remover from MovieGenerator (`LoadBackgroundRemovalModel` with `birefnet.safetensors`, `RemoveBackground`, `InvertMask`, and `JoinImageWithAlpha`).
+  - Seamless inline execution: ComfyUI automatically appends the BiRefNet node chain to generation workflows, producing crisp, transparent RGBA PNGs directly from GPU inference.
+  - Standalone API integration: `/api/tools/chroma_key` now automatically leverages BiRefNet AI when ComfyUI is online, with transparent fallback to color flood-fill when an explicit chroma color is chosen with the eyedropper.
+  - Transparency Preservation: Updated `ProjectManager` to detect pre-existing clean alpha channels and preserve fine edge feathering without destructive CPU re-keying.
+- **Resolution of Vertically Stacked Double-Heads**:
+  - Root Cause: Prompts specifying full-body clothing/shoes (e.g. jeans, high heels) collided with portrait perspective prefixes and negative prompts forbidding lower bodies (`full body, feet, shoes, legs`) on tall 512x768/896x1152 canvases, forcing the model to generate a second bust/head to fill the bottom half.
+  - Added dedicated `full_body` ("Full Body (Adventure / Point & Click)") perspective to `settings/perspectives.json` and Studio UI for head-to-toe character sprites.
+  - Dynamic Prompt Sanitation: Portrait bust framing and negative bans on legs/shoes are now automatically bypassed if the user's prompt mentions shoes, pants, or legs.
+  - Added anti-stacking negative tokens: `stacked, vertically stacked, stacked heads, double head, two heads, multiple heads, cloned head, extra face, double bust, two bodies, split image, horizontal split, twin`.
   - Added automated prompt sanitation for portraits to remove contradictory full-body keywords.
 
 ---

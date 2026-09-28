@@ -207,7 +207,9 @@ class ComfyClient:
         sampler_name: Optional[str] = None,
         scheduler: Optional[str] = None,
         reference_image: Optional[str] = None,
-        denoise: float = 1.0
+        denoise: float = 1.0,
+        model_preset: Optional[Dict[str, Any]] = None,
+        remove_background: bool = False
     ) -> Dict[str, Any]:
         """
         Dynamically finds and configures nodes in standard ComfyUI API workflows:
@@ -295,13 +297,30 @@ class ComfyClient:
                 model_source_node = unet_id
             logger.info(f"Using Custom UNet: {resolved_unet}")
 
-        # 1.6. Special Architecture Handling: Anima (uses Qwen 0.6B / Anima text encoder and Wan 2.1 VAE)
-        if is_anima:
+        # 1.6. Architecture-specific handling (Anima, Flux, SDXL via model_preset or auto-detection)
+        clip_candidates = []
+        vae_candidates = []
+        clip_type = "stable_diffusion"
+
+        if model_preset and "defaults" in model_preset:
+            p_def = model_preset["defaults"]
+            clip_candidates = p_def.get("clip_candidates", [])
+            vae_candidates = p_def.get("vae_candidates", [])
+            clip_type = p_def.get("clip_type", "stable_diffusion")
+        elif is_anima:
+            clip_candidates = ["qwen_3_06b_base.safetensors", "jedpointreal_animaV1_txt.safetensors"]
+            vae_candidates = [
+                "qwen_image_vae.safetensors",
+                "QwenImage\\qwen_image_vae.safetensors",
+                "QwenImage/qwen_image_vae.safetensors",
+                "qwen_vae.safetensors"
+            ]
+
+        if clip_candidates:
             avail_clips = available.get("clips", [])
-            anima_clip_candidates = ["qwen_3_06b_base.safetensors", "jedpointreal_animaV1_txt.safetensors"]
-            chosen_clip = next((c for c in anima_clip_candidates if c in avail_clips), None)
+            chosen_clip = next((c for c in clip_candidates if c in avail_clips or c.replace("/", "\\") in avail_clips), None)
             if not chosen_clip:
-                chosen_clip = next((c for c in avail_clips if "qwen_3_06" in c.lower() or "anima" in c.lower()), None)
+                chosen_clip = next((c for c in avail_clips if any(pat in c.lower() for pat in ["qwen_3_06", "anima"])), None)
             if not chosen_clip and avail_clips:
                 chosen_clip = avail_clips[0]
 
@@ -312,9 +331,9 @@ class ComfyClient:
                     "class_type": "CLIPLoader",
                     "inputs": {
                         "clip_name": chosen_clip,
-                        "type": "stable_diffusion"
+                        "type": clip_type
                     },
-                    "_meta": {"title": f"Load Anima Text Encoder ({chosen_clip})"}
+                    "_meta": {"title": f"Load Native Text Encoder ({chosen_clip})"}
                 }
                 # Rewire CLIP consumers from ckpt_node_id to clip_loader_id
                 for nid, n in wf.items():
@@ -326,32 +345,31 @@ class ComfyClient:
                                 n["inputs"][in_name] = [clip_loader_id, 0]
                 clip_source_node = clip_loader_id
                 clip_source_slot = 0
-                logger.info(f"Using Anima Native Text Encoder: {chosen_clip} (Resolved 768 vs 2048 CLIP mismatch)")
+                logger.info(f"Using Native Text Encoder: {chosen_clip} for {model_preset.get('name') if model_preset else 'Anima'}")
 
-            # Auto Wan 2.1 VAE for Anima if no custom VAE explicitly selected
-            if not vae or vae.lower() in ("default", ""):
-                anima_vae_candidates = ["wan_2.1_vae.safetensors", "Wan\\wan_2.1_vae.safetensors", "Wan/wan_2.1_vae.safetensors"]
-                chosen_vae = next((v for v in anima_vae_candidates if v in avail_vaes or v.replace("/", "\\") in avail_vaes), None)
-                if not chosen_vae:
-                    chosen_vae = next((v for v in avail_vaes if "wan" in v.lower()), None)
-                if chosen_vae:
-                    vae_loader_id = str(max(numeric_ids, default=70) + 2)
-                    numeric_ids.append(int(vae_loader_id))
-                    wf[vae_loader_id] = {
-                        "class_type": "VAELoader",
-                        "inputs": {"vae_name": chosen_vae},
-                        "_meta": {"title": f"Load Anima VAE ({chosen_vae})"}
-                    }
-                    for nid, n in wf.items():
-                        if n.get("class_type") == "VAEDecode":
-                            n.setdefault("inputs", {})["vae"] = [vae_loader_id, 0]
-                    vae_source_node = vae_loader_id
-                    vae_source_slot = 0
-                    logger.info(f"Using Anima Native VAE: {chosen_vae}")
+        # Auto Native VAE if no custom VAE explicitly selected
+        if (not vae or vae.lower() in ("default", "")) and vae_candidates:
+            chosen_vae = next((v for v in vae_candidates if v in avail_vaes or v.replace("/", "\\") in avail_vaes), None)
+            if not chosen_vae:
+                chosen_vae = next((v for v in avail_vaes if "qwen" in v.lower()), None)
+            if chosen_vae:
+                vae_loader_id = str(max(numeric_ids, default=70) + 2)
+                numeric_ids.append(int(vae_loader_id))
+                wf[vae_loader_id] = {
+                    "class_type": "VAELoader",
+                    "inputs": {"vae_name": chosen_vae},
+                    "_meta": {"title": f"Load Native VAE ({chosen_vae})"}
+                }
+                for nid, n in wf.items():
+                    if n.get("class_type") == "VAEDecode":
+                        n.setdefault("inputs", {})["vae"] = [vae_loader_id, 0]
+                vae_source_node = vae_loader_id
+                vae_source_slot = 0
+                logger.info(f"Using Native Architecture VAE: {chosen_vae}")
 
-            # Safe to decouple CheckpointLoader when Anima takes over all roles
-            if ckpt_node_id and ckpt_node_id in wf:
-                wf.pop(ckpt_node_id, None)
+        # Safe to decouple CheckpointLoader when custom UNet and Text Encoder take over all roles
+        if clip_candidates and ckpt_node_id and ckpt_node_id in wf:
+            wf.pop(ckpt_node_id, None)
 
         # 2. Inject or Configure LoRA if requested
         if lora and lora.strip() and lora.lower() != "none":
@@ -499,7 +517,107 @@ class ComfyClient:
             for k_id in ksampler_nodes:
                 wf[k_id].setdefault("inputs", {})["denoise"] = denoise
 
+        # 6. BiRefNet AI Background Removal Injection (Movie Generator Pipeline)
+        if remove_background:
+            vae_decode_id = next((nid for nid, n in wf.items() if n.get("class_type") == "VAEDecode"), None)
+            if vae_decode_id:
+                bg_model_id = str(max(numeric_ids, default=880) + 1)
+                numeric_ids.append(int(bg_model_id))
+                wf[bg_model_id] = {
+                    "class_type": "LoadBackgroundRemovalModel",
+                    "inputs": {"bg_removal_name": "birefnet.safetensors"},
+                    "_meta": {"title": "Load BiRefNet Background Model"}
+                }
+
+                rem_bg_id = str(max(numeric_ids, default=880) + 1)
+                numeric_ids.append(int(rem_bg_id))
+                wf[rem_bg_id] = {
+                    "class_type": "RemoveBackground",
+                    "inputs": {
+                        "bg_removal_model": [bg_model_id, 0],
+                        "image": [vae_decode_id, 0]
+                    },
+                    "_meta": {"title": "BiRefNet Remove Background"}
+                }
+
+                invert_id = str(max(numeric_ids, default=880) + 1)
+                numeric_ids.append(int(invert_id))
+                wf[invert_id] = {
+                    "class_type": "InvertMask",
+                    "inputs": {"mask": [rem_bg_id, 0]},
+                    "_meta": {"title": "Invert Mask"}
+                }
+
+                join_alpha_id = str(max(numeric_ids, default=880) + 1)
+                numeric_ids.append(int(join_alpha_id))
+                wf[join_alpha_id] = {
+                    "class_type": "JoinImageWithAlpha",
+                    "inputs": {
+                        "image": [vae_decode_id, 0],
+                        "alpha": [invert_id, 0]
+                    },
+                    "_meta": {"title": "Join Image with Alpha (Transparent PNG)"}
+                }
+
+                # Rewire SaveImage nodes to output transparent RGBA image
+                for nid, n in wf.items():
+                    if n.get("class_type") == "SaveImage":
+                        in_imgs = n.get("inputs", {}).get("images")
+                        if isinstance(in_imgs, list) and len(in_imgs) >= 1 and str(in_imgs[0]) == str(vae_decode_id):
+                            n["inputs"]["images"] = [join_alpha_id, 0]
+                logger.info("Injected native BiRefNet Background Removal into generation pipeline.")
+
         return wf
+
+    def remove_background_birefnet(self, image_bytes: bytes) -> bytes:
+        """
+        Executes high-fidelity BiRefNet AI background removal on the given image bytes via ComfyUI.
+        Returns transparent RGBA PNG bytes.
+        """
+        uploaded_name = self.upload_image(image_bytes, filename="biref_input.png")
+        wf = {
+            "1": {
+                "class_type": "LoadImage",
+                "inputs": {"image": uploaded_name}
+            },
+            "2": {
+                "class_type": "LoadBackgroundRemovalModel",
+                "inputs": {"bg_removal_name": "birefnet.safetensors"}
+            },
+            "3": {
+                "class_type": "RemoveBackground",
+                "inputs": {
+                    "bg_removal_model": ["2", 0],
+                    "image": ["1", 0]
+                }
+            },
+            "4": {
+                "class_type": "InvertMask",
+                "inputs": {"mask": ["3", 0]}
+            },
+            "5": {
+                "class_type": "JoinImageWithAlpha",
+                "inputs": {
+                    "image": ["1", 0],
+                    "alpha": ["4", 0]
+                }
+            },
+            "6": {
+                "class_type": "SaveImage",
+                "inputs": {
+                    "filename_prefix": "BiRefNet_Out",
+                    "images": ["5", 0]
+                }
+            }
+        }
+        prompt_id = self.queue_prompt(wf)
+        if not prompt_id:
+            raise RuntimeError("Failed to queue BiRefNet prompt.")
+        outputs = self.wait_for_completion(prompt_id)
+        if not outputs:
+            raise RuntimeError("BiRefNet execution timed out or failed.")
+        fn, subf, ftype = outputs[0]
+        return self.get_image_data(fn, subf, ftype)
 
     def wait_for_completion(
         self,

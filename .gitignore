@@ -49,6 +49,9 @@ output/*
 Thumbs.db
 Desktop.ini
 
+# Scratch debug files
+scratch/
+
 # Logs & Diagnostics
 *.log
 npm-debug.log*

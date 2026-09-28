@@ -1,6 +1,18 @@
 {
   "styles": [
     {
+      "id": "photorealistic_cinematic",
+      "name": "Photorealistic / Cinematic (Movie Generator Style)",
+      "prompt": "photorealistic 35mm cinematic film footage, real life camera shot, hyperrealistic textures, natural skin tones, professional studio lighting, 8k, sharp focus, clean background",
+      "negative": "blurry, low quality, cartoon, anime, illustration, 3D render, drawing, pixelated, distorted, bad anatomy, deformed"
+    },
+    {
+      "id": "anime_aesthetic",
+      "name": "Anime Aesthetic (High Detail)",
+      "prompt": "anime aesthetic style, highly detailed anime visual novel art, vibrant colors, clean smooth shading, masterpiece, sharp focus, clean solid background",
+      "negative": "blurry, low quality, photorealistic, 3D render artifacts, western cartoon, noisy, distorted"
+    },
+    {
       "id": "pixel_art_16bit",
       "name": "16-Bit Pixel Art (SNES / Genesis)",
       "prompt": "16-bit pixel art style, crisp edges, limited palette, handcrafted pixels, nostalgic video game sprite, clean outline, solid white background, high contrast dithering",

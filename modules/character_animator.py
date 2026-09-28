@@ -34,21 +34,31 @@ class CharacterAnimatorModule(BaseAssetModule):
             }
             extra = action_tags.get(action.lower(), f"{action} pose")
             
-            # Anti-multi-character & anti-spritesheet protection
+            # Anti-multi-character, anti-stacking & anti-spritesheet protection
             anti_sheet_pos = "single character, solo"
             if perspective == "portrait":
-                anti_sheet_pos += ", centered bust shot, head and shoulders portrait"
+                # Only frame as bust if prompt does NOT explicitly specify full-body clothing/shoes
+                has_lower_body = any(t in pos.lower() for t in ["shoes", "schuhe", "hose", "pants", "jeans", "feet", "legs", "stöckelschuhe", "boots", "full body"])
+                if not has_lower_body:
+                    anti_sheet_pos += ", centered bust shot, head and shoulders portrait"
+                else:
+                    anti_sheet_pos += ", centered composition, single person"
+            elif perspective == "full_body":
+                anti_sheet_pos += ", standing full body shot, visible head to toe, complete standing silhouette"
             
             context["positive_prompt"] = f"{anti_sheet_pos}, {pos}, {extra}, consistent character design, matching clothing and colors"
 
             neg = context.get("negative_prompt", "")
             sheet_neg = (
+                "stacked, vertically stacked, stacked heads, double head, two heads, multiple heads, "
+                "cloned head, extra face, double bust, two bodies, split image, horizontal split, two people, twin, "
                 "multiple characters, multiple views, character sheet, expressions sheet, "
-                "portrait sheet, collage, montage, side by side, extra heads, duplicate heads, "
-                "cloned face, border avatars, icons, split view, multi-panel, comic layout"
+                "portrait sheet, collage, montage, side by side, border avatars, icons, split view, multi-panel, comic layout"
             )
             if perspective == "portrait":
-                sheet_neg += ", full body, feet, shoes, legs, standing full length"
+                has_lower_body = any(t in pos.lower() for t in ["shoes", "schuhe", "hose", "pants", "jeans", "feet", "legs", "stöckelschuhe", "boots", "full body"])
+                if not has_lower_body:
+                    sheet_neg += ", full body, feet, shoes, legs, standing full length"
                 
             context["negative_prompt"] = f"{sheet_neg}, {neg}".strip(", ")
 

@@ -1,0 +1,120 @@
+{
+  "families": [
+    {
+      "id": "anima_dit",
+      "name": "Anima DiT Engine (Qwen Image)",
+      "description": "High-detail Anime & Photorealistic DiT architecture using Qwen 0.6B text encoder and Qwen Image VAE.",
+      "badge": "Anima DiT",
+      "match_patterns": ["anima", "photanima", "catpony_ani", "jedpointreal"],
+      "defaults": {
+        "sampler_name": "er_sde",
+        "scheduler": "beta57",
+        "steps": 28,
+        "cfg": 4.0,
+        "vae_candidates": [
+          "qwen_image_vae.safetensors",
+          "QwenImage\\qwen_image_vae.safetensors",
+          "QwenImage/qwen_image_vae.safetensors",
+          "qwen_vae.safetensors"
+        ],
+        "clip_candidates": [
+          "qwen_3_06b_base.safetensors",
+          "jedpointreal_animaV1_txt.safetensors"
+        ],
+        "clip_type": "stable_diffusion",
+        "native_latent": {
+          "portrait": {"width": 896, "height": 1024},
+          "full_body": {"width": 896, "height": 1152},
+          "square": {"width": 1024, "height": 1024},
+          "landscape": {"width": 1152, "height": 896}
+        },
+        "recommended_scaling": "lanczos",
+        "recommended_style": "photorealistic_cinematic",
+        "purge_anti_photo_negatives": true
+      }
+    },
+    {
+      "id": "sdxl_pony",
+      "name": "SDXL / Pony / Illustrious (1024 Native)",
+      "description": "Large-scale 1024px diffusion models for detailed anime, stylized or semi-realistic art.",
+      "badge": "SDXL / Pony",
+      "match_patterns": ["sdxl", "pony", "illustrious", "xl_", "-xl", "_xl"],
+      "defaults": {
+        "sampler_name": "euler_ancestral",
+        "scheduler": "karras",
+        "steps": 26,
+        "cfg": 5.5,
+        "vae_candidates": [
+          "sdxl_vae.safetensors"
+        ],
+        "clip_candidates": [],
+        "clip_type": "stable_diffusion",
+        "native_latent": {
+          "portrait": {"width": 896, "height": 1024},
+          "full_body": {"width": 832, "height": 1216},
+          "square": {"width": 1024, "height": 1024},
+          "landscape": {"width": 1216, "height": 832}
+        },
+        "recommended_scaling": "bicubic",
+        "recommended_style": "anime_aesthetic",
+        "purge_anti_photo_negatives": false
+      }
+    },
+    {
+      "id": "flux_dit",
+      "name": "Flux.1 DiT Engine",
+      "description": "Next-generation 12B DiT model for high-fidelity text-to-image and sprite generation.",
+      "badge": "Flux DiT",
+      "match_patterns": ["flux"],
+      "defaults": {
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "steps": 20,
+        "cfg": 3.5,
+        "vae_candidates": [
+          "Flux\\ae.safetensors",
+          "ae.safetensors"
+        ],
+        "clip_candidates": [
+          "t5xxl_fp16.safetensors",
+          "clip_l.safetensors"
+        ],
+        "clip_type": "stable_diffusion",
+        "native_latent": {
+          "portrait": {"width": 896, "height": 1024},
+          "full_body": {"width": 896, "height": 1152},
+          "square": {"width": 1024, "height": 1024},
+          "landscape": {"width": 1152, "height": 896}
+        },
+        "recommended_scaling": "lanczos",
+        "recommended_style": "photorealistic_cinematic",
+        "purge_anti_photo_negatives": true
+      }
+    },
+    {
+      "id": "sd15_pixel",
+      "name": "Stable Diffusion 1.5 (Classic / Pixel Art)",
+      "description": "Standard 512px SD1.5 base models optimized for fast generation, LoRAs and authentic pixel sprites.",
+      "badge": "SD 1.5",
+      "match_patterns": ["v1-5", "sd15", "pixel", "retro", "*"],
+      "defaults": {
+        "sampler_name": "euler_ancestral",
+        "scheduler": "normal",
+        "steps": 25,
+        "cfg": 7.5,
+        "vae_candidates": [],
+        "clip_candidates": [],
+        "clip_type": "stable_diffusion",
+        "native_latent": {
+          "portrait": {"width": 512, "height": 768},
+          "full_body": {"width": 512, "height": 768},
+          "square": {"width": 512, "height": 512},
+          "landscape": {"width": 768, "height": 512}
+        },
+        "recommended_scaling": "nearest",
+        "recommended_style": "pixel_art_16bit",
+        "purge_anti_photo_negatives": false
+      }
+    }
+  ]
+}

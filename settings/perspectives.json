@@ -40,9 +40,20 @@
       "icon": "bi-person-badge",
       "description": "Close-up bust or half-body portrait for dialogue boxes, menu status screens, and jRPG cutscenes.",
       "prompt_prefix": "solo, single character, centered bust shot, head and shoulders portrait, jRPG dialogue avatar, high quality face and shoulders, expressive eyes and hair, centered composition, clean solid background",
-      "negative_prompt": "multiple characters, multiple views, character sheet, expressions sheet, portrait sheet, collage, montage, side by side, extra heads, duplicate heads, cloned face, border avatars, icons, split view, multi-panel, full body, feet, shoes, legs, tiny sprite, platformer angle, overhead map, blurry face, cropped hair",
+      "negative_prompt": "stacked, vertically stacked, stacked heads, double head, two heads, multiple heads, cloned head, extra face, double bust, two bodies, split image, horizontal split, two people, twin, multiple characters, multiple views, character sheet, expressions sheet, portrait sheet, collage, montage, side by side, border avatars, icons, split view, multi-panel, full body, feet, shoes, legs, tiny sprite, platformer angle, overhead map, blurry face, cropped hair",
       "aspect_ratio": "1:1",
       "ideal_for": ["characters", "ui"]
+    },
+    {
+      "id": "full_body",
+      "name": "Full Body (Adventure)",
+      "badge": "Point & Click / Visual Novel",
+      "icon": "bi-person-standing",
+      "description": "Standing full-body character from head to toe for Point & Click adventures, visual novels, and cutscenes.",
+      "prompt_prefix": "single character, solo, full length shot, standing full body view from head to toe, complete visible feet and shoes, standing posture, complete silhouette, centered composition, clean solid background",
+      "negative_prompt": "stacked, vertically stacked, stacked heads, double head, two heads, multiple heads, cloned head, extra face, double bust, two bodies, split image, horizontal split, two people, twin, cropped feet, cut off legs, cropped head, close up, bust shot, headshot, multiple characters, character sheet, collage, montage, side by side, border avatars, split view, multi-panel",
+      "aspect_ratio": "3:4",
+      "ideal_for": ["characters"]
     }
   ]
 }
