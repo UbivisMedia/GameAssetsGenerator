@@ -29,6 +29,8 @@ Development and feature roadmap for the GameAssetGenerator project.
 - [x] **Portrait / Bust Perspective**: Dedicated 4th perspective for jRPGs, visual novels, dialogue avatars, and status screens.
 - [x] **Dialogue & Lip-Sync Animation Action (`talk`)**: Configurable 2- to 6-step talking cycles with mouth open/close and eye blinking.
 - [x] **96x96 jRPG Portrait Preset**: Standard resolution preset for classic retro RPG face graphics.
+- [x] **Dynamic ComfyUI Model Engine**: Real-time Checkpoint discovery, LoRA injection with weight controls, UNet, VAE, Sampler/Scheduler selection, and auto-fallback.
+- [x] **Integrated LM Studio Model Manager**: Live loaded model detection and in-app model loading.
 - [ ] **Onion Skinning in Preview Player**: Toggleable ghost frames to inspect motion arcs and spacing.
 - [ ] **8-Directional Movement Generator**: Automatic generation of 8-way directional sprites (N, NE, E, SE, S, SW, W, NW) for Top-Down and Isometric.
 - [ ] **Normal Map & Depth Map Generation**: Real-time normal map baking for dynamic 2D lighting in Godot and Unity.

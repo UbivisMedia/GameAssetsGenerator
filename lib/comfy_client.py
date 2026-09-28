@@ -87,6 +87,40 @@ class ComfyClient:
             logger.error(f"Failed to queue prompt to ComfyUI: {e}")
             raise RuntimeError(f"ComfyUI queue prompt error: {e}")
 
+    def get_available_models(self) -> Dict[str, Any]:
+        """
+        Queries ComfyUI object_info to retrieve all installed checkpoints,
+        unets, loras, vaes, and sampler options.
+        """
+        models = {
+            "checkpoints": [],
+            "unets": [],
+            "loras": [],
+            "vaes": [],
+            "samplers": [],
+            "schedulers": []
+        }
+        try:
+            url = f"{self.base_url}/object_info"
+            req = urllib.request.Request(url)
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+
+            if "CheckpointLoaderSimple" in data:
+                models["checkpoints"] = data["CheckpointLoaderSimple"]["input"]["required"]["ckpt_name"][0]
+            if "UNETLoader" in data:
+                models["unets"] = data["UNETLoader"]["input"]["required"]["unet_name"][0]
+            if "LoraLoader" in data:
+                models["loras"] = data["LoraLoader"]["input"]["required"]["lora_name"][0]
+            if "VAELoader" in data:
+                models["vaes"] = data["VAELoader"]["input"]["required"]["vae_name"][0]
+            if "KSampler" in data:
+                models["samplers"] = data["KSampler"]["input"]["required"]["sampler_name"][0]
+                models["schedulers"] = data["KSampler"]["input"]["required"]["scheduler"][0]
+        except Exception as e:
+            logger.warning(f"Failed to fetch ComfyUI models: {e}")
+        return models
+
     def inject_parameters(
         self,
         workflow: Dict[str, Any],
@@ -97,18 +131,110 @@ class ComfyClient:
         seed: Optional[int] = None,
         steps: int = 25,
         cfg: float = 7.5,
-        batch_size: int = 1
+        batch_size: int = 1,
+        checkpoint: Optional[str] = None,
+        unet: Optional[str] = None,
+        lora: Optional[str] = None,
+        lora_strength: float = 1.0,
+        vae: Optional[str] = None,
+        sampler_name: Optional[str] = None,
+        scheduler: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Dynamically finds and configures nodes in standard ComfyUI API workflows:
+        - CheckpointLoaderSimple (Dynamic Checkpoint selection with auto-fallback)
+        - LoraLoader (Dynamically injected if specified)
+        - VAELoader (Optional external VAE)
         - CLIPTextEncode (Positive / Negative)
         - EmptyLatentImage (Width, Height, Batch Size)
-        - KSampler (Seed, Steps, CFG)
+        - KSampler (Seed, Steps, CFG, Sampler, Scheduler)
         """
         import copy
         wf = copy.deepcopy(workflow)
 
-        # Identify positive and negative nodes by checking connections to KSampler
+        # 1. Resolve Checkpoint
+        available = self.get_available_models()
+        avail_ckpts = available.get("checkpoints", [])
+
+        # Find CheckpointLoaderSimple node
+        ckpt_nodes = [k for k, v in wf.items() if v.get("class_type") in ("CheckpointLoaderSimple", "CheckpointLoader")]
+        ckpt_node_id = ckpt_nodes[0] if ckpt_nodes else None
+
+        if ckpt_node_id:
+            current_ckpt = wf[ckpt_node_id].get("inputs", {}).get("ckpt_name", "")
+            target_ckpt = checkpoint
+
+            # If user didn't specify checkpoint or specified one not in ComfyUI, auto-fallback
+            if not target_ckpt or (avail_ckpts and target_ckpt not in avail_ckpts):
+                if avail_ckpts:
+                    # Filter out non-image models (audio, music, etc.)
+                    image_ckpts = [
+                        c for c in avail_ckpts
+                        if not any(skip in c.lower() for skip in ("audio", "yue", "music", "sound", "voice"))
+                    ]
+                    candidates = image_ckpts or avail_ckpts
+                    # Prefer standard SD1.5 or anime/pixel art checkpoints
+                    pref = [c for c in candidates if "sd 1.5" in c.lower() or "anime" in c.lower()]
+                    target_ckpt = pref[0] if pref else candidates[0]
+                else:
+                    target_ckpt = current_ckpt
+
+            if target_ckpt:
+                wf[ckpt_node_id]["inputs"]["ckpt_name"] = target_ckpt
+                logger.info(f"Using ComfyUI Checkpoint: {target_ckpt}")
+
+        # 2. Inject or Configure LoRA if requested
+        if lora and lora.strip() and lora.lower() != "none" and ckpt_node_id:
+            existing_loras = [k for k, v in wf.items() if v.get("class_type") == "LoraLoader"]
+            if existing_loras:
+                wf[existing_loras[0]]["inputs"]["lora_name"] = lora
+                wf[existing_loras[0]]["inputs"]["strength_model"] = lora_strength
+                wf[existing_loras[0]]["inputs"]["strength_clip"] = lora_strength
+            else:
+                numeric_ids = [int(k) for k in wf.keys() if k.isdigit()]
+                lora_id = str(max(numeric_ids, default=100) + 1)
+                wf[lora_id] = {
+                    "class_type": "LoraLoader",
+                    "inputs": {
+                        "lora_name": lora,
+                        "strength_model": lora_strength,
+                        "strength_clip": lora_strength,
+                        "model": [ckpt_node_id, 0],
+                        "clip": [ckpt_node_id, 1]
+                    },
+                    "_meta": {"title": f"Load LoRA ({lora})"}
+                }
+                # Rewire nodes that connected to ckpt model/clip to lora
+                for nid, n in wf.items():
+                    if nid in (lora_id, ckpt_node_id):
+                        continue
+                    for in_name, in_val in n.get("inputs", {}).items():
+                        if isinstance(in_val, list) and len(in_val) >= 2:
+                            if str(in_val[0]) == ckpt_node_id and in_val[1] == 0:
+                                n["inputs"][in_name] = [lora_id, 0]
+                            elif str(in_val[0]) == ckpt_node_id and in_val[1] == 1:
+                                n["inputs"][in_name] = [lora_id, 1]
+                logger.info(f"Injected LoRA: {lora} (strength: {lora_strength})")
+
+        # 3. Inject or Configure Custom VAE if requested
+        if vae and vae.strip() and vae.lower() != "default":
+            existing_vaes = [k for k, v in wf.items() if v.get("class_type") == "VAELoader"]
+            if existing_vaes:
+                wf[existing_vaes[0]]["inputs"]["vae_name"] = vae
+            else:
+                numeric_ids = [int(k) for k in wf.keys() if k.isdigit()]
+                vae_id = str(max(numeric_ids, default=200) + 2)
+                wf[vae_id] = {
+                    "class_type": "VAELoader",
+                    "inputs": {"vae_name": vae},
+                    "_meta": {"title": f"Load VAE ({vae})"}
+                }
+                for nid, n in wf.items():
+                    if n.get("class_type") == "VAEDecode":
+                        n.setdefault("inputs", {})["vae"] = [vae_id, 0]
+                logger.info(f"Using Custom VAE: {vae}")
+
+        # 4. Identify positive and negative nodes by checking connections to KSampler
         ksampler_nodes = [k for k, v in wf.items() if v.get("class_type") in ("KSampler", "KSamplerAdvanced")]
         pos_id, neg_id = None, None
 
@@ -133,6 +259,10 @@ class ComfyClient:
                     inputs["steps"] = steps
                 if cfg:
                     inputs["cfg"] = cfg
+                if sampler_name:
+                    inputs["sampler_name"] = sampler_name
+                if scheduler:
+                    inputs["scheduler"] = scheduler
 
             # Dimensions
             elif class_type in ("EmptyLatentImage", "EmptySD3LatentImage", "EmptyFluxLatent"):

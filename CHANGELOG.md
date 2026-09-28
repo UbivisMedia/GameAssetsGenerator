@@ -26,6 +26,15 @@ All notable changes and milestones of the GameAssetGenerator project are documen
 - **Linux & macOS Start Script (`start.sh`)**:
   - Added bash launcher with automatic Python interpreter detection and virtual environment support (`.venv`/`venv`).
   - Added `.gitattributes` to ensure LF line endings for shell scripts.
+- **Dynamic Checkpoint, LoRA, UNet & VAE Selection (ComfyUI)**:
+  - Added live model discovery endpoint `/api/comfy/models` retrieving all installed Checkpoints, UNets, LoRAs, VAEs, Samplers, and Schedulers.
+  - Implemented dynamic LoRA injection into ComfyUI workflow graph with customizable model and clip strength weights.
+  - Implemented automatic checkpoint validation and fallback: eliminates `Value not in list: ckpt_name` errors by automatically matching installed image models instead of hardcoded strings.
+  - Added folder-grouped dropdowns in the Web UI for easy navigation across models.
+- **LM Studio Integration & Active Model Management**:
+  - Added `/api/lm/models` and `/api/lm/load-model` endpoints for real-time model status and in-app loading.
+  - Added LM Studio model selector and active loaded model indicator in the Studio interface.
+  - Automatic loaded model detection and auto-load fallback for prompt enhancement and animation planning.
 
 ---
 

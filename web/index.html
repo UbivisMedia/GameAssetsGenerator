@@ -236,6 +236,66 @@
           </div>
         </div>
 
+        <!-- AI Models & Engine Selection (ComfyUI) -->
+        <div class="card section-card">
+          <div class="card-header flex-between">
+            <div class="flex-align-gap">
+              <span class="card-icon">🧠</span>
+              <h2>AI Models & Engine (ComfyUI)</h2>
+            </div>
+            <button id="btn-refresh-models" class="mini-btn" title="Refresh ComfyUI and LM Studio Models">↻ Refresh</button>
+          </div>
+
+          <div class="form-group">
+            <div class="flex-between">
+              <label for="checkpoint-select">Diffusion Checkpoint (Base Model)</label>
+              <span id="checkpoint-badge" class="badge">Loading models...</span>
+            </div>
+            <select id="checkpoint-select" class="form-input font-mono"></select>
+          </div>
+
+          <div class="form-group mt-2">
+            <div class="flex-between">
+              <label for="lora-select">LoRA Style / Character (Optional)</label>
+              <span class="sub-label">Weight: <strong id="lora-strength-val" class="neon-text">1.0</strong></span>
+            </div>
+            <div class="input-with-action">
+              <select id="lora-select" class="form-input font-mono">
+                <option value="">-- None / No LoRA --</option>
+              </select>
+              <input type="range" id="lora-strength-slider" min="0.1" max="1.5" step="0.05" value="1.0" class="mini-range" title="LoRA Strength">
+            </div>
+          </div>
+
+          <details class="advanced-details mt-2">
+            <summary>Advanced Engine Settings (UNet, VAE, Sampler)</summary>
+            <div class="form-grid two-cols mt-2">
+              <div class="form-group">
+                <label for="unet-select">Custom UNet (Optional)</label>
+                <select id="unet-select" class="form-input font-mono">
+                  <option value="">-- Use Checkpoint UNet --</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="vae-select">Custom VAE (Optional)</label>
+                <select id="vae-select" class="form-input font-mono">
+                  <option value="">-- Baked-in VAE --</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-grid two-cols mt-2">
+              <div class="form-group">
+                <label for="sampler-select">Sampler</label>
+                <select id="sampler-select" class="form-input font-mono"></select>
+              </div>
+              <div class="form-group">
+                <label for="scheduler-select">Scheduler</label>
+                <select id="scheduler-select" class="form-input font-mono"></select>
+              </div>
+            </div>
+          </details>
+        </div>
+
         <!-- Prompt & AI Enhancement -->
         <div class="card section-card">
           <div class="card-header">
@@ -249,12 +309,15 @@
           <div class="form-group mt-2">
             <div class="flex-between">
               <label for="prompt-input">Asset Description (Prompt)</label>
-              <button id="btn-enhance-prompt" class="text-button-ai">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                </svg>
-                Enhance with AI
-              </button>
+              <div class="flex-gap-sm">
+                <select id="lm-model-select" class="form-input mini" title="Select LM Studio model"></select>
+                <button id="btn-enhance-prompt" class="text-button-ai">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                  </svg>
+                  Enhance with AI
+                </button>
+              </div>
             </div>
             <textarea id="prompt-input" class="form-textarea" rows="3" placeholder="e.g. Heroic knight in heavy steel plate armor with a broadsword"></textarea>
           </div>

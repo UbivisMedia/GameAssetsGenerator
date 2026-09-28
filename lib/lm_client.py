@@ -13,36 +13,123 @@ logger = logging.getLogger("LMClient")
 
 
 class LMClient:
-    def __init__(self, base_url: str = "http://127.0.0.1:1234/v1", model: str = "local-model", temperature: float = 0.7):
+    def __init__(self, base_url: str = "http://127.0.0.1:1234/v1", model: Optional[str] = None, temperature: float = 0.7):
         self.base_url = base_url.rstrip("/")
-        self.model = model
+        # Root url without /v1
+        self.root_url = self.base_url[:-3] if self.base_url.endswith("/v1") else self.base_url
+        self.model = model or "local-model"
         self.temperature = temperature
 
     def check_connection(self) -> Dict[str, Any]:
-        """Checks if LM Studio local server is online."""
+        """Checks if LM Studio is reachable and detects loaded/available models."""
         try:
-            req = urllib.request.Request(f"{self.base_url}/models")
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                if resp.status == 200:
-                    data = json.loads(resp.read().decode("utf-8"))
-                    models = [m.get("id") for m in data.get("data", [])]
-                    return {
-                        "online": True,
-                        "url": self.base_url,
-                        "models": models,
-                        "selected_model": self.model
-                    }
+            # Query /api/v0/models for rich status if available
+            loaded_model = None
+            models_list = []
+            
+            try:
+                req_v0 = urllib.request.Request(f"{self.root_url}/api/v0/models")
+                with urllib.request.urlopen(req_v0, timeout=3) as resp_v0:
+                    data_v0 = json.loads(resp_v0.read().decode("utf-8"))
+                    for m in data_v0.get("data", []):
+                        m_id = m.get("id")
+                        models_list.append(m_id)
+                        if m.get("state") == "loaded":
+                            loaded_model = m_id
+            except Exception:
+                pass
+
+            if not models_list:
+                # Fallback to OpenAI standard /v1/models
+                req = urllib.request.Request(f"{self.base_url}/models")
+                with urllib.request.urlopen(req, timeout=3) as resp:
+                    if resp.status == 200:
+                        data = json.loads(resp.read().decode("utf-8"))
+                        models_list = [m.get("id") for m in data.get("data", [])]
+
+            if loaded_model:
+                self.model = loaded_model
+
+            has_loaded = bool(loaded_model)
+            return {
+                "online": True,
+                "url": self.base_url,
+                "models": models_list,
+                "loaded_model": loaded_model,
+                "has_loaded_model": has_loaded,
+                "selected_model": self.model if has_loaded else "None (Model not loaded)"
+            }
         except Exception as e:
             return {
                 "online": False,
                 "url": self.base_url,
-                "error": str(e)
+                "error": str(e),
+                "has_loaded_model": False
             }
-        return {"online": False, "url": self.base_url, "error": "Unknown status"}
+
+    def get_models(self) -> List[Dict[str, Any]]:
+        """Returns details of all installed models in LM Studio."""
+        results = []
+        try:
+            req = urllib.request.Request(f"{self.root_url}/api/v0/models")
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                for m in data.get("data", []):
+                    results.append({
+                        "id": m.get("id"),
+                        "name": m.get("id"),
+                        "type": m.get("type", "llm"),
+                        "state": m.get("state", "not-loaded"),
+                        "is_loaded": m.get("state") == "loaded",
+                        "size": m.get("quantization", "")
+                    })
+        except Exception:
+            # Fallback to /v1/models
+            try:
+                req = urllib.request.Request(f"{self.base_url}/models")
+                with urllib.request.urlopen(req, timeout=3) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    for m in data.get("data", []):
+                        m_id = m.get("id")
+                        results.append({
+                            "id": m_id,
+                            "name": m_id,
+                            "type": "llm",
+                            "state": "unknown",
+                            "is_loaded": True
+                        })
+            except Exception:
+                pass
+        return results
+
+    def load_model(self, model_id: str) -> Dict[str, Any]:
+        """Loads a model into LM Studio using lms CLI or API."""
+        import subprocess
+        try:
+            cmd = ["lms", "load", model_id, "-y", "--gpu", "max"]
+            p = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            if p.returncode == 0:
+                self.model = model_id
+                return {"status": "success", "model": model_id, "output": p.stdout}
+            return {"status": "error", "message": p.stderr or p.stdout}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
 
     def complete_chat(self, system_prompt: str, user_prompt: str, temperature: Optional[float] = None) -> str:
         """Sends a chat completion request to LM Studio."""
         temp = temperature if temperature is not None else self.temperature
+
+        # Ensure we have the active loaded model
+        if self.model in ("local-model", None, ""):
+            conn = self.check_connection()
+            if conn.get("loaded_model"):
+                self.model = conn["loaded_model"]
+            elif conn.get("models"):
+                # Filter out embedding models
+                llm_candidates = [m for m in conn["models"] if "embed" not in m.lower()]
+                if llm_candidates:
+                    self.load_model(llm_candidates[0])
+
         payload = {
             "model": self.model,
             "messages": [
@@ -58,11 +145,19 @@ class LMClient:
             data=data,
             headers={"Content-Type": "application/json"}
         )
-        with urllib.request.urlopen(req, timeout=45) as resp:
-            res = json.loads(resp.read().decode("utf-8"))
-            choices = res.get("choices", [])
-            if choices and "message" in choices[0]:
-                return choices[0]["message"].get("content", "").strip()
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                res = json.loads(resp.read().decode("utf-8"))
+                choices = res.get("choices", [])
+                if choices and "message" in choices[0]:
+                    return choices[0]["message"].get("content", "").strip()
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode("utf-8", errors="ignore")
+            logger.error(f"LM Studio chat completion HTTP error {e.code}: {err_body}")
+            raise RuntimeError(f"LM Studio Error: {err_body}")
+        except Exception as e:
+            logger.error(f"LM Studio chat completion error: {e}")
+            raise
         return ""
 
     def enhance_asset_prompt(

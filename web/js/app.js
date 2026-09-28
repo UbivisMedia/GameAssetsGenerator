@@ -76,6 +76,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const cfgInput = document.getElementById('cfg-input');
   const checkRembg = document.getElementById('check-rembg');
 
+  // AI Models & Engine Elements
+  const checkpointSelect = document.getElementById('checkpoint-select');
+  const checkpointBadge = document.getElementById('checkpoint-badge');
+  const loraSelect = document.getElementById('lora-select');
+  const loraStrengthSlider = document.getElementById('lora-strength-slider');
+  const loraStrengthVal = document.getElementById('lora-strength-val');
+  const unetSelect = document.getElementById('unet-select');
+  const vaeSelect = document.getElementById('vae-select');
+  const samplerSelect = document.getElementById('sampler-select');
+  const schedulerSelect = document.getElementById('scheduler-select');
+  const btnRefreshModels = document.getElementById('btn-refresh-models');
+  const lmModelSelect = document.getElementById('lm-model-select');
+
   const btnGenerate = document.getElementById('btn-generate');
   const btnGenerateMock = document.getElementById('btn-generate-mock');
 
@@ -142,8 +155,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // LM Studio Status
       if (data.lm_studio && data.lm_studio.online) {
-        statusLMStudio.className = 'status-pill status-online';
-        statusLMStudio.querySelector('.status-label').textContent = 'LM Studio: Ready';
+        if (data.lm_studio.has_loaded_model) {
+          statusLMStudio.className = 'status-pill status-online';
+          const modelName = data.lm_studio.loaded_model ? data.lm_studio.loaded_model.split('/').pop() : 'Ready';
+          statusLMStudio.querySelector('.status-label').textContent = `LM Studio: ${modelName}`;
+        } else {
+          statusLMStudio.className = 'status-pill status-offline';
+          statusLMStudio.querySelector('.status-label').textContent = 'LM Studio: No Model Loaded';
+        }
       } else {
         statusLMStudio.className = 'status-pill status-offline';
         statusLMStudio.querySelector('.status-label').textContent = 'LM Studio: Offline';
@@ -151,6 +170,131 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {
       statusComfyUI.className = 'status-pill status-offline';
       statusLMStudio.className = 'status-pill status-offline';
+    }
+  }
+
+  // --- Model Grouping & Loading ---
+  function groupItemsByFolder(items, selectElem, emptyLabel = null) {
+    if (!selectElem) return;
+    selectElem.innerHTML = '';
+    if (emptyLabel) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = emptyLabel;
+      selectElem.appendChild(opt);
+    }
+    const groups = {};
+    items.forEach(item => {
+      let folder = 'Root';
+      let name = item;
+      if (item.includes('\\')) {
+        const parts = item.split('\\');
+        folder = parts.slice(0, -1).join(' / ');
+        name = parts[parts.length - 1];
+      } else if (item.includes('/')) {
+        const parts = item.split('/');
+        folder = parts.slice(0, -1).join(' / ');
+        name = parts[parts.length - 1];
+      }
+      if (!groups[folder]) groups[folder] = [];
+      groups[folder].push({ value: item, label: name });
+    });
+
+    Object.keys(groups).sort().forEach(folder => {
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = folder;
+      groups[folder].forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g.value;
+        opt.textContent = g.label;
+        optgroup.appendChild(opt);
+      });
+      selectElem.appendChild(optgroup);
+    });
+  }
+
+  async function loadModels() {
+    if (!checkpointSelect) return;
+    try {
+      if (checkpointBadge) checkpointBadge.textContent = 'Fetching models...';
+      const res = await fetch('/api/comfy/models');
+      const data = await res.json();
+      state.models = data;
+
+      // 1. Checkpoints
+      const ckpts = data.checkpoints || [];
+      if (checkpointBadge) checkpointBadge.textContent = `${ckpts.length} available`;
+      groupItemsByFolder(ckpts, checkpointSelect);
+      const savedCkpt = localStorage.getItem('gag_checkpoint');
+      if (savedCkpt && ckpts.includes(savedCkpt)) {
+        checkpointSelect.value = savedCkpt;
+      } else if (ckpts.length > 0) {
+        const imageCkpts = ckpts.filter(c => !c.toLowerCase().includes('audio') && !c.toLowerCase().includes('yue'));
+        const candidates = imageCkpts.length > 0 ? imageCkpts : ckpts;
+        const pref = candidates.find(c => c.toLowerCase().includes('sd 1.5') || c.toLowerCase().includes('anime')) || candidates[0];
+        checkpointSelect.value = pref;
+      }
+
+      // 2. LoRAs
+      const loras = data.loras || [];
+      groupItemsByFolder(loras, loraSelect, '-- None / No LoRA --');
+      const savedLora = localStorage.getItem('gag_lora');
+      if (savedLora && loras.includes(savedLora)) {
+        loraSelect.value = savedLora;
+      }
+
+      // 3. UNets
+      const unets = data.unets || [];
+      groupItemsByFolder(unets, unetSelect, '-- Use Checkpoint UNet --');
+
+      // 4. VAEs
+      const vaes = data.vaes || [];
+      groupItemsByFolder(vaes, vaeSelect, '-- Baked-in VAE --');
+
+      // 5. Samplers & Schedulers
+      if (samplerSelect) {
+        samplerSelect.innerHTML = '';
+        (data.samplers || ['euler_ancestral', 'euler', 'dpmpp_2m']).forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s;
+          opt.textContent = s;
+          if (s === 'euler_ancestral') opt.selected = true;
+          samplerSelect.appendChild(opt);
+        });
+      }
+
+      if (schedulerSelect) {
+        schedulerSelect.innerHTML = '';
+        (data.schedulers || ['karras', 'normal', 'sgm_uniform']).forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s;
+          opt.textContent = s;
+          if (s === 'karras') opt.selected = true;
+          schedulerSelect.appendChild(opt);
+        });
+      }
+    } catch (e) {
+      if (checkpointBadge) checkpointBadge.textContent = 'Offline';
+      console.error('Failed to load ComfyUI models:', e);
+    }
+  }
+
+  async function loadLMModels() {
+    if (!lmModelSelect) return;
+    try {
+      const res = await fetch('/api/lm/models');
+      const data = await res.json();
+      lmModelSelect.innerHTML = '';
+      const list = data.models || [];
+      list.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = `${m.is_loaded ? '● ' : '○ '}${m.name} ${m.is_loaded ? '(Active)' : ''}`;
+        if (m.is_loaded) opt.selected = true;
+        lmModelSelect.appendChild(opt);
+      });
+    } catch (e) {
+      console.error('Failed to load LM Studio models:', e);
     }
   }
 
@@ -173,6 +317,8 @@ document.addEventListener('DOMContentLoaded', () => {
       updatePerspectiveUI();
       updateStepBreakdownUI();
       await loadProjects();
+      await loadModels();
+      await loadLMModels();
     } catch (e) {
       console.error('Config load failed:', e);
       showToast('Error loading configuration');
@@ -582,8 +728,22 @@ document.addEventListener('DOMContentLoaded', () => {
       steps: parseInt(comfySteps.value, 10) || 25,
       cfg: parseFloat(cfgInput.value) || 7.5,
       remove_background: checkRembg.checked,
-      mock_demo: isMock
+      mock_demo: isMock,
+      checkpoint: checkpointSelect ? checkpointSelect.value : null,
+      unet: unetSelect ? unetSelect.value : null,
+      lora: loraSelect ? loraSelect.value : null,
+      lora_strength: loraStrengthSlider ? parseFloat(loraStrengthSlider.value) : 1.0,
+      vae: vaeSelect ? vaeSelect.value : null,
+      sampler_name: samplerSelect ? samplerSelect.value : null,
+      scheduler: schedulerSelect ? schedulerSelect.value : null
     };
+
+    if (checkpointSelect && checkpointSelect.value) {
+      localStorage.setItem('gag_checkpoint', checkpointSelect.value);
+    }
+    if (loraSelect && loraSelect.value) {
+      localStorage.setItem('gag_lora', loraSelect.value);
+    }
 
     btnGenerate.disabled = true;
     btnGenerateMock.disabled = true;
@@ -615,6 +775,48 @@ document.addEventListener('DOMContentLoaded', () => {
         </svg> Generate Asset
       `;
     }
+  }
+
+  // --- Model Control Listeners ---
+  if (loraStrengthSlider && loraStrengthVal) {
+    loraStrengthSlider.addEventListener('input', (e) => {
+      loraStrengthVal.textContent = parseFloat(e.target.value).toFixed(2);
+    });
+  }
+
+  if (btnRefreshModels) {
+    btnRefreshModels.addEventListener('click', async () => {
+      showToast('Refreshing ComfyUI & LM Studio models...');
+      await loadModels();
+      await loadLMModels();
+      await checkServices();
+      showToast('Models refreshed!');
+    });
+  }
+
+  if (lmModelSelect) {
+    lmModelSelect.addEventListener('change', async () => {
+      const selectedModel = lmModelSelect.value;
+      if (!selectedModel) return;
+      showToast(`Loading LM Studio model: ${selectedModel}...`);
+      try {
+        const res = await fetch('/api/lm/load-model', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model_id: selectedModel })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          showToast('LM Studio model loaded successfully!');
+          await checkServices();
+          await loadLMModels();
+        } else {
+          showToast(`Failed to load model: ${data.message || 'error'}`);
+        }
+      } catch (e) {
+        showToast('Error communicating with LM Studio');
+      }
+    });
   }
 
   btnGenerate.addEventListener('click', () => triggerGeneration(false));

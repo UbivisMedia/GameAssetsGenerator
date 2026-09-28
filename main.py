@@ -4,6 +4,7 @@ FastAPI backend providing REST endpoints, static asset serving,
 and orchestration between ComfyUI, LM Studio, and the Sprite Engine.
 """
 
+from datetime import datetime
 import json
 import logging
 import os
@@ -114,6 +115,13 @@ class GenerateAssetRequest(BaseModel):
     character_name: Optional[str] = None
     set_as_master: bool = False
     use_character_reference: bool = True
+    checkpoint: Optional[str] = None
+    unet: Optional[str] = None
+    lora: Optional[str] = None
+    lora_strength: float = 1.0
+    vae: Optional[str] = None
+    sampler_name: Optional[str] = None
+    scheduler: Optional[str] = None
 
 
 
@@ -135,6 +143,31 @@ def get_service_status():
         "lm_studio": lm_client.check_connection(),
         "loaded_modules_count": len(mod_mgr.modules)
     }
+
+
+@app.get("/api/comfy/models")
+def get_comfy_models():
+    """Returns all available ComfyUI checkpoints, unets, loras, vaes, and samplers."""
+    return comfy_client.get_available_models()
+
+
+@app.get("/api/lm/models")
+def get_lm_models():
+    """Returns all installed models in LM Studio and their loading state."""
+    return {
+        "models": lm_client.get_models(),
+        "selected_model": lm_client.model
+    }
+
+
+@app.post("/api/lm/load-model")
+def load_lm_model(data: Dict[str, str]):
+    """Dynamically loads a model into LM Studio via CLI/API."""
+    model_id = data.get("model_id", "").strip()
+    if not model_id:
+        raise HTTPException(status_code=400, detail="model_id is required")
+    res = lm_client.load_model(model_id)
+    return res
 
 
 @app.get("/api/config")
@@ -486,7 +519,14 @@ def generate_asset(req: GenerateAssetRequest):
             height=latent_h,
             seed=seed,
             steps=req.steps,
-            cfg=req.cfg
+            cfg=req.cfg,
+            checkpoint=req.checkpoint,
+            unet=req.unet,
+            lora=req.lora,
+            lora_strength=req.lora_strength,
+            vae=req.vae,
+            sampler_name=req.sampler_name,
+            scheduler=req.scheduler
         )
 
         try:
@@ -546,7 +586,13 @@ def generate_asset(req: GenerateAssetRequest):
         "negative_prompt": context["negative_prompt"],
         "seed": seed,
         "is_mock": use_mock,
-        "workflow": req.workflow_name
+        "workflow": req.workflow_name,
+        "checkpoint": req.checkpoint,
+        "lora": req.lora,
+        "lora_strength": req.lora_strength,
+        "vae": req.vae,
+        "sampler_name": req.sampler_name,
+        "scheduler": req.scheduler
     }
 
     if req.rubrik == "characters" or char_id:

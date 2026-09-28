@@ -23,6 +23,10 @@ A modular AI studio designed for generating 2D and 2.5D game assets with consist
   - Preset motions: **Walk Cycle**, **Sit Down**, **Jump Cycle**, **Run Cycle**, **Attack / Slash**, **Talk (Dialogue / Lip Sync)**, **Idle Stance**, or **Custom**.
   - Configurable step count (2 to 16 individual frames).
   - AI-assisted keyframe planning via LM Studio or rule-based animation breakdown templates.
+- **Dynamic Model & Engine Selection (ComfyUI & LM Studio)**:
+  - Live discovery and folder-grouped selection of all local Checkpoints, LoRAs (with adjustable strength), UNets, VAEs, Samplers, and Schedulers.
+  - Automatic fallback prevention (prevents `ckpt_name not in list` errors by auto-detecting valid installed image checkpoints).
+  - Integrated LM Studio model loader, status indicator, and prompt refinement.
 - **Modular Plugin Architecture (`modules/`)**:
   - Easily extend the generator by dropping Python modules into `modules/`.
   - Simple `BaseAssetModule` lifecycle hooks (`on_prompt_prepare`, `on_workflow_prepare`, `on_postprocess`, `register_routes`).
